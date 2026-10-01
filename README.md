@@ -14,6 +14,8 @@
 
 JJ's Tools is a [Meteor Client][meteor] add-on specifically built for 2b2t.
 
+It is very important to use the mod "ViaFabricPlus" and select version 1.20.5/1.20.6 red protocol for silent rotations to work properly
+
 Credit to lambda and stardust for some modules
 
 ## Requirements
