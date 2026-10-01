@@ -1,0 +1,58 @@
+plugins {
+	id 'fabric-loom' version '1.14-SNAPSHOT'
+}
+
+version = "${project.mod_version}+${project.minecraft_version}"
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	mavenCentral()
+	maven {
+		name = 'meteor-maven'
+		url = 'https://maven.meteordev.org/releases'
+	}
+	maven {
+		name = 'meteor-maven-snapshots'
+		url = 'https://maven.meteordev.org/snapshots'
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	// Meteor 1.21.11 is still on Yarn, so this addon has to be too.
+	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "meteordevelopment:meteor-client:${project.meteor_version}"
+
+	// MP3 decoding for Chat Notifier (LGPL-2.1). Bundled inside the JJ's Tools jar.
+	implementation "javazoom:jlayer:1.0.1"
+	include "javazoom:jlayer:1.0.1"
+}
+
+processResources {
+	inputs.property 'version', project.version
+	filesMatching('fabric.mod.json') {
+		expand 'version': project.version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	from('LICENSE') {
+		rename { "${it}_${project.archives_base_name}" }
+	}
+}

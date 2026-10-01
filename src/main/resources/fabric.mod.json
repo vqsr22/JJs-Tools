@@ -1,0 +1,29 @@
+{
+	"schemaVersion": 1,
+	"id": "jjs-tools",
+	"version": "${version}",
+	"name": "JJ's Tools",
+	"description": "Meteor addon built for 2b2t with quality of life, automation and hunting modules.",
+	"authors": [
+		"JJ"
+	],
+	"license": "GPL-3.0",
+	"environment": "client",
+	"entrypoints": {
+		"meteor": [
+			"dev.jjstools.JJsTools"
+		]
+	},
+	"mixins": [
+		"jjs-tools.mixins.json"
+	],
+	"custom": {
+		"meteor-client:color": "120,60,200"
+	},
+	"depends": {
+		"java": ">=21",
+		"minecraft": "~1.21.11",
+		"meteor-client": "*"
+	},
+	"icon": "assets/jjs-tools/icon.png"
+}
