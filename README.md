@@ -31,10 +31,10 @@ Credit to lambda and stardust for some modules
 
 | Module | Description |
 |---|---|
-| **Ad Blocker** | Hides advertisers in chat |
+| **AdBlocker** | Hides advertisers in chat |
 | **Advanced Autolog** | Auto logging for AFK travel over long distances |
+| **Anti Item Frame** | Stops you rotating or interacting with item frames by accident |
 | **Auto Door** | Opens doors ahead of you and shuts them behind you |
-| **Auto Dye Shulkers** | Dyes shulker boxes and bundles in the crafting grid |
 | **Auto Mason** | Automates stonecutter actions |
 | **Auto Omen** | Drinks ominous bottles with advanced options for specific farm types |
 | **Auto Smith** | Upgrades gear and trims armour at smithing tables |
@@ -52,14 +52,14 @@ Credit to lambda and stardust for some modules
 | **Farm Aura** | Plants a chosen crop on every tilled dirt in reach |
 | **Fast Rename** | Renames items in bulk at an anvil |
 | **Grinder** | Automates grindstone actions |
-| **Incognito** | Covers your coordinates and minimap for screenshots and streams |
-| **Item Frame Block** | Stops you rotating or interacting with item frames by accident |
+| **Incognito** | Covers your coordinates and minimap for screenshots and streams |=
 | **Light Levels** | Improved from meteor's. Where mobs can spawn, as clean coloured squares, with a spawn area filter per dimension |
 | **Portal Print Detector** | Finds the footprint a removed nether portal leaves behind by finding 4x1 holes or 4x1 netherrack in nylium or soul sand/soil |
 | **Portal Scraps** | Finds leftover obsidian in the Nether. Ignores ruined portals using crying obsidian and chests in them, and optionally ignores highways and ring roads |
 | **Rare Item Highlighter** | Highlights rare, unique and anomalous items in container slots |
+| **Shulker Dyer** | Dyes shulker boxes and bundles in the crafting grid |
 | **Rubberband Notifier** | Reports rubberbands with how many ticks you lost and how far you were moved |
-| **Tab Optimizer** | Makes the tab list cheap to draw on servers with huge player counts |
+| **Tablist Optimisations** | Makes the tab list cheap to draw on servers with huge player counts |
 | **Team Trees** | Plants saplings, either replanting a fixed plot you give coordinates for or scattering them across the ground around you |
 | **Tiller** | Tills nearby dirt and grass |
 | **Via Texture Fix** | Repairs the names, item and block textures broken by ViaFabricPlus |
