@@ -6,8 +6,6 @@
 
 </div>
 
----
-
 ## Overview
 
 JJ's Tools is a [Meteor Client][meteor] add-on specifically built for 2b2t.
