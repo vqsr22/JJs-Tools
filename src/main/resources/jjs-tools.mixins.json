@@ -1,0 +1,41 @@
+{
+	"required": true,
+	"minVersion": "0.8",
+	"package": "dev.jjstools.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"mixins": [],
+	"client": [
+		"AnvilScreenMixin",
+		"AutoArmorMixin",
+		"BipedEntityRendererMixin",
+		"BlurMixin",
+		"BossBarHudAccessor",
+		"CategoryAccessorMixin",
+		"ClientPlayNetworkHandlerMixin",
+		"DoorBlockMixin",
+		"EnchantmentNameMixin",
+		"GoatHornItemMixin",
+		"HandledScreenRareItemMixin",
+		"InGameHudTabMixin",
+		"InteractBlockMixin",
+		"ItemEnchantmentsComponentMixin",
+		"ItemModelSwapMixin",
+		"ItemNameMixin",
+		"ItemStackTooltipMixin",
+		"PlayerListHudMixin",
+		"PlayerSkinDrawerMixin",
+		"ShulkerBoxScreenMixin",
+		"TrimMaterialPropertyMixin",
+		"WorldMixin",
+		"accessor.AnvilScreenAccessor",
+		"accessor.AnvilScreenHandlerAccessor",
+		"accessor.ClientConnectionAccessor",
+		"accessor.DisconnectS2CPacketAccessor",
+		"accessor.GameOptionsAccessor",
+		"accessor.GrindstoneScreenHandlerAccessor",
+		"accessor.ScreenTitleAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
