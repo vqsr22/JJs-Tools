@@ -42,7 +42,6 @@ public class JJsTools extends MeteorAddon {
         Modules.get().add(new AutoMason());
         Modules.get().add(new AutoDyeShulkers());
         Modules.get().add(new AdvancedAutolog());
-        Modules.get().add(new AutoSmith());
         Modules.get().add(new FastRename());
         Modules.get().add(new RareItemHighlighter());
         Modules.get().add(new BannerData());
@@ -67,13 +66,18 @@ public class JJsTools extends MeteorAddon {
         Modules.get().add(new Tiller());
         Modules.get().add(new TeamTrees());
         Modules.get().add(new FarmAura());
+        Modules.get().add(new KitCreator());
+        Modules.get().add(new NoJolt());
+        Modules.get().add(new ChatPresets());
 
         dev.jjstools.util.BlurExtras.init();
         dev.jjstools.util.JJConfig.initialize();
         dev.jjstools.util.MsgUtil.initModulePrefixes();
         dev.jjstools.util.EncounterStore.load();
         registerEncountersTab();
+        dev.jjstools.util.ModuleRenames.applyAll();
         dev.jjstools.util.CategoryIcons.applyAll();
+        dev.jjstools.util.CategoryIcons.hook();
         dev.jjstools.hud.JJsHud.init();
     }
 
@@ -91,12 +95,16 @@ public class JJsTools extends MeteorAddon {
         }
 
         var icons = new dev.jjstools.gui.IconsTab();
+        var conflicts = new dev.jjstools.gui.ConflictsTab();
 
         if (index == -1) {
             tabs.add(tab);
             tabs.add(icons);
+            tabs.add(conflicts);
         }
         else {
+            // Added back to front, since each lands at the same index and pushes the last one down.
+            tabs.add(index, conflicts);
             tabs.add(index, icons);
             tabs.add(index, tab);
         }

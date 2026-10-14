@@ -5,6 +5,7 @@ import meteordevelopment.meteorclient.gui.GuiTheme;
 import meteordevelopment.meteorclient.gui.tabs.Tab;
 import meteordevelopment.meteorclient.gui.tabs.TabScreen;
 import meteordevelopment.meteorclient.gui.tabs.WindowTabScreen;
+import meteordevelopment.meteorclient.gui.widgets.containers.WTable;
 import meteordevelopment.meteorclient.gui.widgets.pressable.WButton;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.ItemSetting;
@@ -55,7 +56,9 @@ public class IconsTab extends Tab {
         @Override
         public void initWidgets() {
             add(theme.label("Category icons, including other addons' categories.")).expandX();
-            add(theme.label("From JJ's Tools").color(theme.textSecondaryColor())).expandX();
+            WTable credit = add(theme.table()).widget();
+            credit.add(theme.label("From ").color(theme.textSecondaryColor()));
+            credit.add(theme.label("JJ's Tools").color(Credit.PURPLE));
             add(theme.horizontalSeparator()).padVertical(6).expandX();
 
             rows.clear();

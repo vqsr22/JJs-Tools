@@ -61,7 +61,9 @@ public class EncountersTab extends Tab {
         @Override
         public void initWidgets() {
             add(theme.label("Requires the encounters module to be on to record anything.")).expandX();
-            add(theme.label("From JJ's Tools").color(theme.textSecondaryColor())).expandX();
+            WTable credit = add(theme.table()).widget();
+            credit.add(theme.label("From ").color(theme.textSecondaryColor()));
+            credit.add(theme.label("JJ's Tools").color(Credit.PURPLE));
 
             // The tab only shows what the module has recorded, so say so rather than letting an
             // empty list look broken.

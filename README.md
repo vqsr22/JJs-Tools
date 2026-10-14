@@ -32,13 +32,12 @@ Credit to lambda and stardust for some modules
 | Module | Description |
 |---|---|
 | **Ad Blocker** | Hides advertisers in chat |
-| **Advanced Autolog** | Logging tools for AFK travel, including logging on a server restart and clicking a trapdoor or lever before it drops you |
+| **Advanced Autolog** | Logging tools for AFK travel: health, totem pops, crystals placed next to you, a player coming near, reaching a set of coordinates, standing still, server restarts, and clicking a trapdoor or lever before it drops you |
 | **Anti Item Frame** | Stops you rotating or interacting with item frames by accident |
 | **Anti Rocket Place** | Makes rockets boost you instead of firing at whatever block you are looking at |
 | **Auto Door** | Opens doors ahead of you and shuts them behind you |
 | **Auto Mason** | Works the stonecutter for you |
 | **Auto Omen** | Drinks ominous bottles |
-| **Auto Smith** | Upgrades gear and trims armour at smithing tables |
 | **Auto Torch** | Lights an area with as few torches as possible, rather than one every few blocks |
 | **Auto Turtle Helmet** | Puts a turtle helmet on from your inventory |
 | **Auto Wear Gold** | Puts a gold piece on while piglins are near and your own piece back after. Any of the four slots, leggings by default |
@@ -46,16 +45,19 @@ Credit to lambda and stardust for some modules
 | **Battle Cry** | Sounds a goat horn when a player enters render distance |
 | **Bed Marker** | Marks the bed you last set your spawn at, kept across sessions. Clears itself if the bed is broken in front of you |
 | **Chat Notifications** | Plays a sound on whispers and mentions |
-| **Chat Tweaks** | Cleans up chat: green text, the arrow prefix, and the junk other clients append |
+| **Chat Presets** | Says a line, or a chain of lines with a delay between them, on a key |
+| **Chat Tweaks** | Cleans up chat: green text, the arrow prefix, and the junk other clients append, including bare random tokens. Can hide those messages outright instead |
 | **Custom Trims** | Client side armour trims on your own armour, worn or carried, visible only to you |
 | **Elytra Takeoff** | Jump, open the elytra and fire a rocket on one key, swapping your chestplate out on takeoff and back on landing |
 | **Encounters** | Records every player you meet, with first and last sighting, count and coordinates. Has its own tab in the Meteor GUI |
 | **Farm Aura** | Plants a chosen crop on every empty bit of farmland in reach |
-| **Fast Rename** | Renames items in bulk at an anvil |
+| **Fast Rename** | Renames items in bulk at an anvil, opening the replacement when one breaks under you |
 | **Grinder** | Strips enchantments off selected items at the grindstone |
 | **Illegal Disconnect** | Leaves by making the server kick you, so it reads as a crash. Falls back to a normal disconnect on a proxy |
 | **Incognito** | Covers your coordinates and minimap for screenshots and streams |
-| **Light Levels** | Improved from meteor's. Where mobs can spawn, as clean coloured squares, with a spawn area filter per dimension |
+| **Kit Creator** | Scans a shulker box, then lays another one out exactly the same. Rearranges what is already inside, fills the rest from your inventory and shifts out anything that does not belong. Matches by type and enchantments, ignoring names |
+| **Light Levels** | Improved from meteor's. Where mobs can spawn, as clean coloured squares, with a per-mob filter so you can see what a creeper, spider, zombie, skeleton or enderman would actually fit in, and a spawn area filter per dimension |
+| **No Jolt** | Holds the health and hunger icons still instead of letting vanilla shake them at you |
 | **Portal Print Detector** | Finds the footprint a removed nether portal leaves behind: a four long recessed slot, or a patch of bare netherrack sitting in nylium |
 | **Portal Scraps** | Finds leftover obsidian in the Nether. Skips ruined portals and, optionally, highways and ring roads |
 | **Rare Item Highlighter** | Highlights rare, unique and anomalous items in container slots |
@@ -72,13 +74,17 @@ Credit to lambda and stardust for some modules
 
 ## Extra tabs
 
-Two tabs are added to the Meteor GUI.
+Three tabs are added to the Meteor GUI.
 
 **Encounters** lists every player you have met, with buttons to add or remove them as a Meteor
 friend. It only records while the Encounters module is on.
 
 **Icons** sets the category icon for every module category, including categories belonging to other
 add-ons, with an optional enchantment glint.
+
+**Conflicts** lists modules from different add-ons that share a name, and lets you rename either
+side so both are usable. Meteor goes by name, so a clash means one keybind, one command and one
+settings key between the two of them.
 
 ## Where your data is
 
@@ -89,12 +95,15 @@ Anything meant to stay after an update is stored outside Meteor's config, in `.m
 ├── accounts/
 │   └── <your-uuid>/
 │       ├── encounters.json    Players you have met
-│       └── bed-marker.json    Your last bed respawn point
-└── category-icons.json        Custom category icons
+│       ├── bed-marker.json    Your last bed respawn point
+│       └── kit.json           The shulker layout Kit Creator last scanned
+├── category-icons.json        Custom category icons
+└── module-renames.json        Modules you renamed to settle a name clash
 ```
 
-Encounters and your bed are kept per account, so two accounts on one install do not overwrite
-each other. Category icons are shared, since they are a look rather than account data.
+Encounters, your bed and your scanned kit are kept per account, so two accounts on one install do
+not overwrite each other. Category icons and module renames are shared, since they follow the
+add-ons you have installed rather than who is signed in.
 
 Updating Meteor, updating this add-on, or wiping a Meteor profile does not change these.
 

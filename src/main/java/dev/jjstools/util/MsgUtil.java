@@ -18,6 +18,14 @@ import meteordevelopment.meteorclient.systems.modules.Modules;
 public class MsgUtil {
     private final static Map<String, String> modulePrefixes = new HashMap<>();
 
+    /**
+     * Modules whose chat prefix is a set colour rather than a random accent.
+     *
+     * Everything else picks an accent colour once per launch, which is fine for modules that speak
+     * rarely. A module that talks a lot while it works is better off with a fixed, quiet colour.
+     */
+    private final static Map<String, String> fixedPrefixColours = Map.of();
+
     public static String getPrefix() {
         return Formatting.DARK_GRAY + "<" + JJUtil.rCC() +
             Formatting.ITALIC + "✦" + Formatting.DARK_GRAY + ">";
@@ -34,14 +42,15 @@ public class MsgUtil {
     public static void initModulePrefixes() {
         for (Module module : Modules.get().getGroup(JJsTools.CATEGORY)) {
             String name = module.name;
-            String color = JJUtil.rCC();
+            String color = fixedPrefixColours.getOrDefault(name, JJUtil.rCC());
             modulePrefixes.put(name, color);
         }
     }
 
     public static String getModulePrefix(String module) {
         if (!modulePrefixes.containsKey(module)) {
-            return String.valueOf(Formatting.DARK_GRAY) + '[' + JJUtil.rCC() +
+            String colour = fixedPrefixColours.getOrDefault(module, JJUtil.rCC());
+            return String.valueOf(Formatting.DARK_GRAY) + '[' + colour +
                 Formatting.ITALIC + Utils.nameToTitle(module) + Formatting.DARK_GRAY + ']';
         } else {
             return String.valueOf(Formatting.DARK_GRAY) + '[' + modulePrefixes.get(module) +

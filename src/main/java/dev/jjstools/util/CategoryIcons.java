@@ -4,6 +4,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import dev.jjstools.JJsTools;
+import meteordevelopment.meteorclient.MeteorClient;
+import meteordevelopment.meteorclient.events.game.OpenScreenEvent;
+import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.meteorclient.systems.modules.Category;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import net.fabricmc.loader.api.FabricLoader;
@@ -115,6 +118,7 @@ public class CategoryIcons {
         entry.glint = glint;
 
         apply(category);
+        settled = false;
         save();
     }
 
@@ -131,24 +135,78 @@ public class CategoryIcons {
         ORIGINALS.putIfAbsent(category.name, category.icon.copy());
     }
 
-    private static void apply(Category category) {
+    private static boolean apply(Category category) {
         IconEntry entry = ENTRIES.get(category.name);
-        if (entry == null || entry.item == null) return;
+        if (entry == null || entry.item == null) return true;
 
         Identifier id = Identifier.tryParse(entry.item);
-        if (id == null) return;
+        if (id == null) return true; // a bad id will never resolve, so stop waiting on it
+
         Item item = Registries.ITEM.get(id);
-        if (item == Items.AIR) return;
+        if (item == Items.AIR) return false; // registry not ready, or the item is gone
 
         ((ICategoryIcon) category).jjsTools$setIcon(stackFor(item, entry.glint));
+        return true;
     }
 
-    /** Applied once every category from every addon has been registered. */
-    public static synchronized void applyAll() {
+    /**
+     * Applied to every category there is, reporting whether every stored icon actually landed.
+     *
+     * An entry that does not resolve to a real item means the item registry was not ready when
+     * this ran, which is the difference between "nothing was saved" and "try again in a moment".
+     */
+    public static synchronized boolean applyAll() {
         load();
+
+        boolean complete = true;
+
         for (Category category : Modules.loopCategories()) {
             remember(category);
-            apply(category);
+
+            IconEntry entry = ENTRIES.get(category.name);
+            if (entry != null && entry.item != null && !apply(category)) complete = false;
         }
+
+        return complete;
+    }
+
+    // Re-applying
+
+    private static int lastCategoryCount = -1;
+    private static boolean settled = false;
+
+    /**
+     * Why this runs again every time a screen opens.
+     *
+     * Applying once at startup is not enough for two reasons that look identical from the outside.
+     * Add-ons are initialised in turn, so any that load after this one register their categories
+     * afterwards and never see their stored icon. And the icon is read as the GUI builds its
+     * widgets, so the only moment guaranteed to be late enough is just before a screen is built.
+     *
+     * It stops doing the work once every category is accounted for and no new ones have appeared,
+     * so the common case is a count and nothing else.
+     */
+    public static synchronized void applyIfNeeded() {
+        int count = 0;
+        for (Category ignored : Modules.loopCategories()) count++;
+
+        if (settled && count == lastCategoryCount) return;
+
+        lastCategoryCount = count;
+        settled = applyAll();
+    }
+
+    /** Listens for a screen opening, which is the last chance before the GUI reads the icons. */
+    public static void hook() {
+        MeteorClient.EVENT_BUS.subscribe(new Object() {
+            @EventHandler
+            private void onOpenScreen(OpenScreenEvent event) {
+                applyIfNeeded();
+
+                // Module renames have the same problem for the same reason: an add-on that loaded
+                // after this one has not had its stored name put back yet.
+                ModuleRenames.applyAll();
+            }
+        });
     }
 }

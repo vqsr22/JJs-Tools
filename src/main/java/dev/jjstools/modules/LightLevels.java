@@ -20,6 +20,7 @@ import meteordevelopment.meteorclient.utils.world.BlockUtils;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.network.ServerInfo;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 import net.minecraft.world.World;
 
 import java.util.ArrayList;
@@ -51,7 +52,23 @@ public class LightLevels extends Module {
         }
     }
 
+    /**
+     * Hitboxes of the mobs that can be filtered for, width then height in blocks.
+     *
+     * Written out rather than read from the entity registry, because these are the numbers the
+     * filter is actually reasoning about and they are worth being able to read here. Width is what
+     * separates a spider from everything else: at 1.4 blocks it spills a fifth of a block into each
+     * neighbour, so it cannot spawn in a one wide corridor the way a zombie can. Height is what
+     * separates an enderman, which needs three blocks of headroom where the rest need two.
+     */
+    private static final double[] ZOMBIE = {0.6, 1.95};
+    private static final double[] SKELETON = {0.6, 1.99};
+    private static final double[] CREEPER = {0.6, 1.7};
+    private static final double[] SPIDER = {1.4, 0.9};
+    private static final double[] ENDERMAN = {0.6, 2.9};
+
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
+    private final SettingGroup sgMobs = settings.createGroup("Mobs");
     private final SettingGroup sgColours = settings.createGroup("Colours");
     private final SettingGroup sgSpawn = settings.createGroup("Hide In Spawn");
 
@@ -95,6 +112,54 @@ public class LightLevels extends Module {
         .defaultValue(1.0)
         .range(0.2, 1.0)
         .sliderRange(0.2, 1.0)
+        .build()
+    );
+
+    // Mobs
+
+    private final Setting<Boolean> filterByMob = sgMobs.add(new BoolSetting.Builder()
+        .name("filter-by-mob")
+        .description("Only show spots where one of the mobs ticked below would actually fit. Off shows every spot dark enough for anything to spawn.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Boolean> zombie = sgMobs.add(new BoolSetting.Builder()
+        .name("zombie")
+        .description("Also covers husks, drowned and villager zombies, which are the same size.")
+        .visible(filterByMob::get)
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> skeleton = sgMobs.add(new BoolSetting.Builder()
+        .name("skeleton")
+        .description("Also covers strays, which are the same size.")
+        .visible(filterByMob::get)
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> creeper = sgMobs.add(new BoolSetting.Builder()
+        .name("creeper")
+        .visible(filterByMob::get)
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> spider = sgMobs.add(new BoolSetting.Builder()
+        .name("spider")
+        .description("Wide enough to need its neighbours clear as well, so it rules out corridors the others can use.")
+        .visible(filterByMob::get)
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> enderman = sgMobs.add(new BoolSetting.Builder()
+        .name("enderman")
+        .description("Needs three blocks of headroom rather than two.")
+        .visible(filterByMob::get)
+        .defaultValue(false)
         .build()
     );
 
@@ -196,12 +261,46 @@ public class LightLevels extends Module {
 
         BlockIterator.register(horizontalRange.get(), verticalRange.get(), (blockPos, blockState) -> {
             switch (BlockUtils.isValidMobSpawn(blockPos, blockState, lightLevel.get())) {
-                case Potential -> squares.add(squarePool.get().set(blockPos, true));
-                case Always -> squares.add(squarePool.get().set(blockPos, false));
+                case Potential -> {
+                    if (roomFor(blockPos)) squares.add(squarePool.get().set(blockPos, true));
+                }
+                case Always -> {
+                    if (roomFor(blockPos)) squares.add(squarePool.get().set(blockPos, false));
+                }
                 default -> {
                 }
             }
         });
+    }
+
+    /**
+     * True if any of the ticked mobs would fit standing here.
+     *
+     * The light and the floor are already settled by the time this runs; what is left is whether
+     * the mob's own body has room, which is the whole of what separates one mob from another for
+     * spawning purposes. The box is tested against the world the same way the game does it when it
+     * places a mob, so an overhang two blocks up rules out a zombie while leaving a spider, and a
+     * one wide gap rules out the spider while leaving the zombie.
+     */
+    private boolean roomFor(BlockPos pos) {
+        if (!filterByMob.get()) return true;
+
+        return (zombie.get() && fits(pos, ZOMBIE))
+            || (skeleton.get() && fits(pos, SKELETON))
+            || (creeper.get() && fits(pos, CREEPER))
+            || (spider.get() && fits(pos, SPIDER))
+            || (enderman.get() && fits(pos, ENDERMAN));
+    }
+
+    private boolean fits(BlockPos pos, double[] size) {
+        if (mc.world == null) return false;
+
+        double half = size[0] / 2.0;
+        double x = pos.getX() + 0.5;
+        double z = pos.getZ() + 0.5;
+
+        // No entity is passed, so a player or mob already standing on the spot does not hide it.
+        return mc.world.isSpaceEmpty(new Box(x - half, pos.getY(), z - half, x + half, pos.getY() + size[1], z + half));
     }
 
     @EventHandler

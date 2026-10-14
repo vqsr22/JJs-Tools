@@ -2,15 +2,15 @@ package dev.jjstools.modules;
 
 import java.util.List;
 import java.util.ArrayList;
-import java.util.ArrayDeque;
 import dev.jjstools.JJsTools;
 import net.minecraft.item.Item;
 import net.minecraft.text.Text;
 import net.minecraft.item.Items;
+import net.minecraft.entity.player.PlayerEntity;
+import meteordevelopment.meteorclient.systems.friends.Friends;
 import dev.jjstools.util.MsgUtil;
 import org.jetbrains.annotations.Nullable;
 import net.minecraft.item.ItemStack;
-import java.util.concurrent.TimeUnit;
 import dev.jjstools.util.JJUtil;
 import dev.jjstools.util.LogDetails;
 import net.minecraft.sound.SoundEvents;
@@ -18,11 +18,11 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.util.math.BlockPos;
 import dev.jjstools.util.JJConfig;
 import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.world.World;
 import meteordevelopment.orbit.EventHandler;
 import meteordevelopment.orbit.EventPriority;
 import meteordevelopment.meteorclient.settings.*;
 import net.minecraft.component.DataComponentTypes;
-import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.events.game.ReceiveMessageEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
@@ -49,56 +49,25 @@ public class AdvancedAutolog extends Module {
         Module, Settings, None
     }
 
-    private final SettingGroup sgETA = settings.createGroup("ETA Settings (Spoiler)", false);
     private final SettingGroup sgAutoLog = settings.createGroup("AutoLog Settings");
     private final SettingGroup sgNotify = settings.createGroup("Notification Settings");
+    private final SettingGroup sgCoords = settings.createGroup("Coords AutoLog");
+    private final SettingGroup sgIdle = settings.createGroup("Standing Still");
+
+    /** Which world the target coordinates belong to. */
+    public enum TargetDimension {
+        Any,
+        Overworld,
+        Nether,
+        End
+    }
     private final SettingGroup sgPreLog = settings.createGroup("Before Logging");
 
-    private final Setting<Boolean> etaSetting = sgETA.add(
-        new BoolSetting.Builder()
-            .name("display-ETA")
-            .description("Display an estimated time of arrival for your target coords.")
-            .defaultValue(false)
-            .build()
-    );
-    public final Setting<Integer> targetX = sgETA.add(
-        new IntSetting.Builder()
-            .name("target-X")
-            .description("Not dimension-translated.")
-            .range(-30000000, 30000000).noSlider().defaultValue(0)
-            .onChanged(it -> this.bpsValues.clear())
-            .build()
-    );
-    public final Setting<Integer> targetZ = sgETA.add(
-        new IntSetting.Builder()
-            .name("target-Z")
-            .description("Not dimension-translated.")
-            .range(-30000000, 30000000).noSlider().defaultValue(0)
-            .onChanged(it -> this.bpsValues.clear())
-            .build()
-    );
-    private final Setting<Boolean> speedUpdates = sgETA.add(
-        new BoolSetting.Builder()
-            .name("average-speed-updates")
-            .description("Display your average speed over a period of time.")
-            .defaultValue(false)
-            .build()
-    );
-    private final Setting<Boolean> averageETA = sgETA.add(
-        new BoolSetting.Builder()
-            .name("ETA-average")
-            .description("Display ETA based on your average speed over X minutes.")
-            .defaultValue(false)
-            .build()
-    );
-    private final Setting<Integer> averageSpeedMinutes = sgETA.add(
-        new IntSetting.Builder()
-            .name("average-speed-over-X-minutes")
-            .description("Display your average speed over a period of time.")
-            .range(0, 3200).sliderRange(0, 60).defaultValue(10)
-            .onChanged(it -> this.bufferSize = it * 1200)
-            .build()
-    );
+    /** What standing still should do: leave, or try to get moving again. */
+    public enum IdleAction {
+        Disconnect,
+        Chat
+    }
 
     private final Setting<Boolean> forceKick = sgAutoLog.add(
         new BoolSetting.Builder()
@@ -115,26 +84,26 @@ public class AdvancedAutolog extends Module {
             .build()
     );
 
+    private final Setting<Boolean> disableAutoReconnect = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("disable-auto-reconnect")
+            .description("Switch auto reconnect off on the way out, so a log you asked for is not undone a second later.")
+            .defaultValue(true)
+            .build()
+    );
+    private final Setting<Boolean> onlyWhenGeared = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("only-when-geared")
+            .description("Only log out for a player wearing armour. Applies to the player triggers below, since a naked player is usually a corpse run rather than a threat.")
+            .defaultValue(false)
+            .build()
+    );
+
     private final Setting<Boolean> antiTrapAutoLog = sgAutoLog.add(
         new BoolSetting.Builder()
             .name("anti-trap-autoLog")
             .description("Illegally disconnects you when any TNT minecarts are rendered, to avoid highway traps.")
             .defaultValue(false)
-            .build()
-    );
-
-    private final Setting<Boolean> etaAutoLog = sgAutoLog.add(
-        new BoolSetting.Builder()
-            .name("ETA-autoLog")
-            .description("Logs you out on arrival at your destination.")
-            .defaultValue(false)
-            .build()
-    );
-    private final Setting<Integer> etaAutoLogThreshold = sgAutoLog.add(
-        new IntSetting.Builder()
-            .name("ETA-autoLog-threshold")
-            .description("Logs you out if you come within <threshold> blocks of your ETA.")
-            .range(0, 25000).noSlider().defaultValue(150)
             .build()
     );
 
@@ -227,6 +196,86 @@ public class AdvancedAutolog extends Module {
             .build()
     );
 
+    private final Setting<Boolean> healthAutoLog = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("health-autoLog")
+            .description("Logs you out when your health drops to the threshold.")
+            .defaultValue(false)
+            .build()
+    );
+    private final Setting<Double> healthThreshold = sgAutoLog.add(
+        new DoubleSetting.Builder()
+            .name("health-threshold")
+            .description("Half hearts. 8 is four hearts, which leaves room for one more hit while the disconnect goes through.")
+            .visible(healthAutoLog::get)
+            .range(1, 20).sliderRange(1, 20).defaultValue(8)
+            .build()
+    );
+
+    private final Setting<Boolean> totemAutoLog = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("totem-pop-autoLog")
+            .description("Logs you out once this many totems have popped.")
+            .defaultValue(false)
+            .build()
+    );
+    private final Setting<Integer> totemPopLimit = sgAutoLog.add(
+        new IntSetting.Builder()
+            .name("totem-pops")
+            .description("Pops to allow before logging. 1 means the first pop takes you off.")
+            .visible(totemAutoLog::get)
+            .range(1, 20).sliderRange(1, 10).defaultValue(1)
+            .build()
+    );
+
+    private final Setting<Boolean> crystalAutoLog = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("crystal-autoLog")
+            .description("Logs you out when an end crystal is placed close enough to hurt you, before it is hit rather than after.")
+            .defaultValue(false)
+            .build()
+    );
+    private final Setting<Integer> crystalRadius = sgAutoLog.add(
+        new IntSetting.Builder()
+            .name("crystal-radius")
+            .description("Blocks. A crystal does its worst within about six, so eight leaves a little room.")
+            .visible(crystalAutoLog::get)
+            .range(2, 32).sliderRange(2, 16).defaultValue(8)
+            .build()
+    );
+
+    private final Setting<Boolean> proximityAutoLog = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("proximity-autoLog")
+            .description("Logs you out when another player comes within range.")
+            .defaultValue(false)
+            .build()
+    );
+    private final Setting<Integer> proximityRadius = sgAutoLog.add(
+        new IntSetting.Builder()
+            .name("proximity-radius")
+            .description("Blocks. Anyone closer than this sets it off.")
+            .visible(proximityAutoLog::get)
+            .range(8, 256).sliderRange(16, 128).defaultValue(64)
+            .build()
+    );
+    private final Setting<Boolean> proximityIgnoreFriends = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("proximity-ignore-friends")
+            .description("Do not log out for your Meteor friends.")
+            .visible(proximityAutoLog::get)
+            .defaultValue(true)
+            .build()
+    );
+    private final Setting<Boolean> proximityIgnoreNaked = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("proximity-ignore-naked")
+            .description("Do not log out for a player wearing no armour.")
+            .visible(proximityAutoLog::get)
+            .defaultValue(true)
+            .build()
+    );
+
     private final Setting<Boolean> elytraNotify = sgNotify.add(
         new BoolSetting.Builder()
             .name("elytra-notify")
@@ -246,6 +295,13 @@ public class AdvancedAutolog extends Module {
             .name("ping-volume")
             .range(0, 5).sliderMin(0).sliderMax(5).defaultValue(.5)
             .build()
+    );
+
+    private final Setting<Boolean> totemPopNotify = sgNotify.add(new BoolSetting.Builder()
+        .name("totem-pop-notify")
+        .description("Say in chat when a totem pops and how many are left in your inventory.")
+        .defaultValue(true)
+        .build()
     );
 
     private final Setting<Boolean> showLogDetails = sgNotify.add(new BoolSetting.Builder()
@@ -303,6 +359,104 @@ public class AdvancedAutolog extends Module {
         .build()
     );
 
+    private final Setting<Boolean> coordsAutoLog = sgCoords.add(new BoolSetting.Builder()
+        .name("coords-autoLog")
+        .description("Logs you out when you come within range of a spot you name.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<TargetDimension> coordsDimension = sgCoords.add(new EnumSetting.Builder<TargetDimension>()
+        .name("dimension")
+        .description("Which world the coordinates are in. Nothing is translated between dimensions, so nether coordinates are nether coordinates.")
+        .visible(coordsAutoLog::get)
+        .defaultValue(TargetDimension.Any)
+        .build()
+    );
+
+    private final Setting<Integer> coordsX = sgCoords.add(new IntSetting.Builder()
+        .name("x-coord")
+        .visible(coordsAutoLog::get)
+        .range(-30000000, 30000000).noSlider().defaultValue(0)
+        .build()
+    );
+
+    private final Setting<Integer> coordsZ = sgCoords.add(new IntSetting.Builder()
+        .name("z-coord")
+        .visible(coordsAutoLog::get)
+        .range(-30000000, 30000000).noSlider().defaultValue(0)
+        .build()
+    );
+
+    private final Setting<Integer> coordsRange = sgCoords.add(new IntSetting.Builder()
+        .name("range")
+        .description("Blocks. Measured flat, so your height does not matter.")
+        .visible(coordsAutoLog::get)
+        .range(1, 30000).sliderRange(1, 1000).defaultValue(200)
+        .build()
+    );
+
+    private final Setting<Boolean> coordsInMessage = sgCoords.add(new BoolSetting.Builder()
+        .name("show-coords")
+        .description("Put the spot you arrived at in the disconnect message.")
+        .visible(coordsAutoLog::get)
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<Boolean> idleAutoLog = sgIdle.add(new BoolSetting.Builder()
+        .name("standing-still-autoLog")
+        .description("Act when you have not moved for a while. Baritone finishing, getting stuck or being knocked off a path all look like standing still.")
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<Integer> idleSeconds = sgIdle.add(new IntSetting.Builder()
+        .name("standing-still-seconds")
+        .description("How long to stay put before it acts.")
+        .visible(idleAutoLog::get)
+        .range(10, 600).sliderRange(10, 300).defaultValue(60)
+        .build()
+    );
+
+    private final Setting<IdleAction> idleAction = sgIdle.add(new EnumSetting.Builder<IdleAction>()
+        .name("standing-still-action")
+        .description("Disconnect leaves. Chat says the lines below instead and keeps waiting, so a stalled Baritone can be told to carry on.")
+        .visible(idleAutoLog::get)
+        .defaultValue(IdleAction.Disconnect)
+        .build()
+    );
+
+    private final Setting<String> idleFirstLine = sgIdle.add(new StringSetting.Builder()
+        .name("first-line")
+        .description("Said as though you typed it. A Baritone command works here.")
+        .visible(() -> idleAutoLog.get() && idleAction.get() == IdleAction.Chat)
+        .defaultValue("#resume")
+        .build()
+    );
+
+    private final Setting<Boolean> idleSecondLine = sgIdle.add(new BoolSetting.Builder()
+        .name("send-a-second-line")
+        .visible(() -> idleAutoLog.get() && idleAction.get() == IdleAction.Chat)
+        .defaultValue(false)
+        .build()
+    );
+
+    private final Setting<String> idleSecondText = sgIdle.add(new StringSetting.Builder()
+        .name("second-line")
+        .visible(() -> idleAutoLog.get() && idleAction.get() == IdleAction.Chat && idleSecondLine.get())
+        .defaultValue("")
+        .build()
+    );
+
+    private final Setting<Integer> idleLineDelay = sgIdle.add(new IntSetting.Builder()
+        .name("delay-between-lines")
+        .description("Ticks between the two lines. 20 is one second. Servers drop messages sent too close together.")
+        .visible(() -> idleAutoLog.get() && idleAction.get() == IdleAction.Chat && idleSecondLine.get())
+        .range(0, 200).sliderRange(0, 100).defaultValue(20)
+        .build()
+    );
+
     /** A log that is waiting on the pre-log task. */
     private @Nullable Text pendingReason = null;
     private boolean pendingForce = false;
@@ -317,13 +471,26 @@ public class AdvancedAutolog extends Module {
 
     private int timer = 0;
     private int ticksNotMoved = 0;
+
+    // Standing still, tracked separately from ticksNotMoved, which is only kept up to date while
+    // the ETA readout is on and is reset by the lag warning.
+    private int idleTicks = 0;
+    private double idleX, idleY, idleZ;
+    private boolean idleKnown = false;
+
+    // The second idle line, waiting on its delay.
+    private @Nullable String queuedLine = null;
+    private int queuedTicks = 0;
+
+    // Totems, counted rather than read off a packet. See popCheck.
+    private int lastTotems = -1;
+    private int totemPops = 0;
+    private int ticksSinceHurt = 999;
     private int ticksSinceWarned = 0;
     private long logOutTimer = -69L;
     private long timerTimestamp = 0L;
     private @Nullable BlockPos lastPos = null;
     private @Nullable Text disconnectReason = null;
-    private int bufferSize = averageSpeedMinutes.get() * 1200;
-    private final ArrayDeque<Double> bpsValues = new ArrayDeque<>();
 
     private void setLogOutTimer(int timer) {
         logOutTimer = timer;
@@ -342,6 +509,10 @@ public class AdvancedAutolog extends Module {
         lastDamage = null;
         lastHealth = -1f;
         disconnectReason = null;
+        resetIdle();
+        lastTotems = -1;
+        totemPops = 0;
+        queuedLine = null;
         timerTimestamp = System.currentTimeMillis();
         if (timeoutAutoLog.get()) {
             MsgUtil.updateModuleMsg("Set Timer AutoLog to disconnect you §a§o" + timeoutAutoLogTimer.get()  + " §7seconds from now.", this.name, "timerAutoLog".hashCode());
@@ -354,12 +525,14 @@ public class AdvancedAutolog extends Module {
         pendingTicks = 0;
         timer = 0;
         lastPos = null;
-        bpsValues.clear();
         ticksNotMoved = 0;
         logOutTimer = -69L;
         timerTimestamp = 0L;
         ticksSinceWarned = 0;
-        bufferSize = averageSpeedMinutes.get() * 1200;
+        resetIdle();
+        lastTotems = -1;
+        totemPops = 0;
+        queuedLine = null;
     }
 
     private void handleDurabilityChecks() {
@@ -470,6 +643,155 @@ public class AdvancedAutolog extends Module {
         return reason.copy().append(capturedDetails);
     }
 
+    private void resetIdle() {
+        idleTicks = 0;
+        idleKnown = false;
+    }
+
+    private int countTotems() {
+        if (mc.player == null) return 0;
+
+        int total = 0;
+        for (int i = 0; i < mc.player.getInventory().size(); i++) {
+            ItemStack stack = mc.player.getInventory().getStack(i);
+            if (stack.isOf(Items.TOTEM_OF_UNDYING)) total += stack.getCount();
+        }
+        return total;
+    }
+
+    /**
+     * Counts totem pops by watching the count fall just after you were hit.
+     *
+     * A pop is not something the client is told about in so many words, so it is inferred. The
+     * count dropping on its own means nothing, since putting totems in a shulker looks the same;
+     * the count dropping within a few ticks of taking damage is a pop. That window is why the hit
+     * is tracked rather than tested on the spot: the item change and the damage do not always land
+     * on the same tick.
+     */
+    private void popCheck() {
+        if (mc.player == null) return;
+
+        if (mc.player.hurtTime > 0) ticksSinceHurt = 0;
+        else if (ticksSinceHurt < 999) ticksSinceHurt++;
+
+        int totems = countTotems();
+
+        if (lastTotems > totems && ticksSinceHurt <= 5) {
+            int popped = lastTotems - totems;
+            totemPops += popped;
+
+            if (totemPopNotify.get()) {
+                MsgUtil.sendModuleMsg("Totem popped §8(§c" + totemPops + "§8) §7totems left: §a" + totems, this.name);
+            }
+        }
+
+        lastTotems = totems;
+    }
+
+    /**
+     * True if this player is wearing any armour at all.
+     *
+     * The four armour slots sit on the end of the inventory, which is why they are read from there
+     * rather than asked for by slot: it is the one way that needs nothing but the inventory you can
+     * already see on another player.
+     */
+    private boolean isGeared(PlayerEntity player) {
+        for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
+            if (!player.getEquippedStack(slot).isEmpty()) return true;
+        }
+        return false;
+    }
+
+    /** The closest player within the radius, friends skipped if asked, or null. */
+    private @Nullable PlayerEntity nearbyPlayer() {
+        if (mc.player == null || mc.world == null) return null;
+
+        double limit = proximityRadius.get() * (double) proximityRadius.get();
+        PlayerEntity closest = null;
+        double closestDistance = Double.MAX_VALUE;
+
+        for (PlayerEntity player : mc.world.getPlayers()) {
+            if (player == mc.player || !player.isAlive()) continue;
+            if (proximityIgnoreFriends.get() && Friends.get().isFriend(player)) continue;
+            if ((proximityIgnoreNaked.get() || onlyWhenGeared.get()) && !isGeared(player)) continue;
+
+            double distance = mc.player.squaredDistanceTo(player);
+            if (distance > limit || distance >= closestDistance) continue;
+
+            closest = player;
+            closestDistance = distance;
+        }
+
+        return closest;
+    }
+
+    /**
+     * Standing still: either leave, or say your lines and keep waiting.
+     *
+     * Position is compared as a distance rather than by block, so turning on the spot or drifting
+     * within one block still counts as standing still, which is what a stalled Baritone looks like.
+     */
+    private void idleCheck() {
+        if (mc.player == null) return;
+
+        if (!idleAutoLog.get()) {
+            resetIdle();
+            return;
+        }
+
+        double x = mc.player.getX(), y = mc.player.getY(), z = mc.player.getZ();
+
+        if (!idleKnown) {
+            idleX = x; idleY = y; idleZ = z;
+            idleKnown = true;
+            idleTicks = 0;
+            return;
+        }
+
+        double dx = x - idleX, dy = y - idleY, dz = z - idleZ;
+        if (dx * dx + dy * dy + dz * dz > 1.0) {
+            idleX = x; idleY = y; idleZ = z;
+            idleTicks = 0;
+            return;
+        }
+
+        if (++idleTicks < idleSeconds.get() * 20) return;
+        idleTicks = 0;
+
+        if (idleAction.get() == IdleAction.Disconnect) {
+            requestLogout(Text.literal("§8[§6Advanced Autolog§8] §fDisconnected you because you have not moved for §6"
+                + idleSeconds.get() + "§f seconds§c!"), forceKick.get());
+            return;
+        }
+
+        say(idleFirstLine.get());
+
+        if (idleSecondLine.get() && !idleSecondText.get().isBlank()) {
+            queuedLine = idleSecondText.get();
+            queuedTicks = idleLineDelay.get();
+        }
+    }
+
+    private boolean inTargetDimension() {
+        if (mc.world == null) return false;
+
+        return switch (coordsDimension.get()) {
+            case Any -> true;
+            case Overworld -> mc.world.getRegistryKey() == World.OVERWORLD;
+            case Nether -> mc.world.getRegistryKey() == World.NETHER;
+            case End -> mc.world.getRegistryKey() == World.END;
+        };
+    }
+
+    /** Says a line the way typing it would, so a client side command prefix still gets picked up. */
+    private void say(String line) {
+        if (line == null || line.isBlank() || mc.getNetworkHandler() == null) return;
+
+        String trimmed = line.trim();
+        if (trimmed.startsWith("/")) mc.getNetworkHandler().sendChatCommand(trimmed.substring(1));
+        else mc.getNetworkHandler().sendChatMessage(trimmed);
+    }
+
     /**
      * Every log goes through here.
      *
@@ -531,7 +853,7 @@ public class AdvancedAutolog extends Module {
 
     private void disconnect(Text reason) {
         if (mc.getNetworkHandler() == null) return;
-        JJUtil.disableAutoReconnect();
+        if (disableAutoReconnect.get()) JJUtil.disableAutoReconnect();
         mc.getNetworkHandler().onDisconnect(new DisconnectS2CPacket(withDetails(reason)));
         switch (autoLogToggle.get()) {
             case Module -> toggle();
@@ -540,12 +862,17 @@ public class AdvancedAutolog extends Module {
     }
 
     private void disableAutoLogSettings() {
-        etaAutoLog.set(false);
         yLevelAutoLog.set(false);
         timeoutAutoLog.set(false);
         antiTrapAutoLog.set(false);
         lowElytraAutoLog.set(false);
         lowRocketsAutoLog.set(false);
+        healthAutoLog.set(false);
+        totemAutoLog.set(false);
+        proximityAutoLog.set(false);
+        crystalAutoLog.set(false);
+        coordsAutoLog.set(false);
+        idleAutoLog.set(false);
     }
 
     /**
@@ -572,6 +899,16 @@ public class AdvancedAutolog extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
+        // The second idle line, once its delay is up.
+        if (queuedLine != null) {
+            if (queuedTicks > 0) queuedTicks--;
+            else {
+                String line = queuedLine;
+                queuedLine = null;
+                say(line);
+            }
+        }
+
         // Pre-log countdown runs before anything else, so a log already in flight finishes.
         if (pendingReason != null) {
             if (pendingTicks > 0) {
@@ -624,6 +961,45 @@ public class AdvancedAutolog extends Module {
             requestLogout(reason, forceKick.get());
         }
 
+        popCheck();
+        idleCheck();
+
+        if (healthAutoLog.get() && mc.player.getHealth() <= healthThreshold.get()) {
+            Text reason = Text.literal("§8[§cAdvanced Autolog§8] §fDisconnected you because your health dropped to §c"
+                + Math.round(mc.player.getHealth()) + "§f of " + healthThreshold.get().intValue() + "§c!");
+            requestLogout(reason, forceKick.get());
+        }
+
+        if (totemAutoLog.get() && totemPops >= totemPopLimit.get()) {
+            Text reason = Text.literal("§8[§cAdvanced Autolog§8] §fDisconnected you after §c" + totemPops
+                + "§f totem pop(s), §a" + countTotems() + "§f left§c!");
+            requestLogout(reason, forceKick.get());
+        }
+
+        if (proximityAutoLog.get()) {
+            PlayerEntity near = nearbyPlayer();
+            if (near != null) {
+                Text reason = Text.literal("§8[§cAdvanced Autolog§8] §fDisconnected you because §c"
+                    + near.getGameProfile().name() + "§f came within §c"
+                    + Math.round(mc.player.distanceTo(near)) + "§f blocks§c!");
+                requestLogout(reason, forceKick.get());
+            }
+        }
+
+        if (coordsAutoLog.get() && inTargetDimension()) {
+            double dx = mc.player.getX() - coordsX.get();
+            double dz = mc.player.getZ() - coordsZ.get();
+            double range = coordsRange.get();
+
+            if (dx * dx + dz * dz <= range * range) {
+                String where = coordsInMessage.get()
+                    ? " §8(§7" + coordsX.get() + ", " + coordsZ.get() + "§8)"
+                    : "";
+                requestLogout(Text.literal("§8[§2Advanced Autolog§8] §fDisconnected you because you reached your destination"
+                    + where + "§2!"), forceKick.get());
+            }
+        }
+
         BlockPos newPos = mc.player.getBlockPos();
 
         if (lastPos == null) lastPos = newPos;
@@ -632,87 +1008,28 @@ public class AdvancedAutolog extends Module {
             lastPos = newPos;
         }
 
-        BlockPos destination = new BlockPos(targetX.get(), mc.player.getBlockY(), targetZ.get());
-
-        int totalBlocksLeft = newPos.getManhattanDistance(destination);
-        double blocksPerSecond = Utils.getPlayerSpeed().horizontalLength();
-
-        if (etaAutoLog.get() && totalBlocksLeft <= etaAutoLogThreshold.get()) {
-            if (mc.getNetworkHandler().getPlayerList().size() > 1) {
-                Text reason = Text.literal("§8[§2Advanced Autolog§8] §fDisconnected you because you have reached your destination§2! §5:§3]");
-                requestLogout(reason, forceKick.get());
-            }
-        }
-
-        if (etaSetting.get()) {
-            if (bpsValues.size() > bufferSize) {
-                int diff = bpsValues.size() - bufferSize;
-                for (int n = 0; n < diff; n++) {
-                    if (!bpsValues.isEmpty()) bpsValues.removeFirst();
-                }
-            } else if (bpsValues.size() == bufferSize) {
-                if (!bpsValues.isEmpty()) bpsValues.removeFirst();
-                bpsValues.add(blocksPerSecond);
-            } else bpsValues.add(blocksPerSecond);
-            if (averageSpeedMinutes.get() > 0) {
-                double average = 0;
-                for (double d : bpsValues) {
-                    average += d;
-                }
-
-                if (averageETA.get()) {
-                    blocksPerSecond = average / bpsValues.size();
-                }
-                if (speedUpdates.get() && timer >= 20) MsgUtil.updateMsg(
-                    "Average speed over " + averageSpeedMinutes.get() + " minute(s): "
-                        + (Math.floor(average / bpsValues.size()) * 3600) / 1000 + "Km/h", "averageBPSUpdate".hashCode()
-                );
-            }
-
-            if (timer >= 20) {
-                timer = 0;
-                if (blocksPerSecond == 0) {
-                    double verticalBPS = Utils.getPlayerSpeed().y;
-                    if (verticalBPS == 0) return;
-                    MsgUtil.updateMsg("Vertical Speed: §6§o" + Math.floor(verticalBPS) + "§7§ob/s. §5§o" + (Math.floor(verticalBPS) * 3600) / 1000 + "§7§oKm/h", "verticalSpeedUpdate".hashCode());
-                    return;
-                }
-                double totalSeconds = totalBlocksLeft / blocksPerSecond;
-
-                long days = TimeUnit.SECONDS.toDays((long) totalSeconds);
-                totalSeconds -= TimeUnit.DAYS.toSeconds(days);
-
-                long hours = TimeUnit.SECONDS.toHours((long) totalSeconds);
-                totalSeconds -= TimeUnit.HOURS.toSeconds(hours);
-
-                long minutes = TimeUnit.SECONDS.toMinutes((long) totalSeconds);
-                totalSeconds -= TimeUnit.MINUTES.toSeconds(minutes);
-
-                long seconds = TimeUnit.SECONDS.toSeconds((long) totalSeconds);
-                StringBuilder sb = new StringBuilder().append(JJUtil.rCC()).append("§8<§a§o✨§r§8> §7§oETA: §2§o");
-
-                if (days == 0 && hours == 0 && minutes == 0 && seconds <= 3) {
-                    if (totalBlocksLeft <= 69) {
-                        sb.append("§2§oYou have arrived at your destination§8§o. §5:§3]");
-                    } else {
-                        sb.append("Imminent§8§o...");
-                    }
-                } else {
-                    if (days != 0) sb.append(days).append(" §7§oDays, §2§o");
-                    if (hours != 0) sb.append(hours).append(" §7§oHours, §2§o");
-                    if (minutes != 0) sb.append(minutes).append(" §7§oMinutes, §2§o");
-                    if (seconds != 0) sb.append(seconds).append(" §7§oSeconds.");
-                }
-
-                MsgUtil.updateMsg(sb.toString(), "AdvancedAutologETAUpdate".hashCode());
-            }
-            lastPos = newPos;
-        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onEntityAddHighPriority(EntityAddedEvent event) {
         if (mc.player == null || mc.world == null) return;
+
+        /*
+         * A crystal is read as a threat the moment it appears, not when it goes off.
+         *
+         * Waiting for the explosion is waiting to be dead: the hit that sets one off and the
+         * damage land together. Anyone placing one within arm's reach of you means it, so the
+         * placement is the warning worth acting on.
+         */
+        if (crystalAutoLog.get() && event.entity.getType() == EntityType.END_CRYSTAL) {
+            double distance = mc.player.distanceTo(event.entity);
+            if (distance <= crystalRadius.get()) {
+                requestLogout(Text.literal("§8[§dAdvanced Autolog§8] §fDisconnected you because an end crystal was placed §d"
+                    + Math.round(distance) + "§f blocks away§c!"), forceKick.get());
+                return;
+            }
+        }
+
         if (!antiTrapAutoLog.get() || event.entity.getType() != EntityType.TNT_MINECART) return;
         requestLogout(Text.literal("§8[§aAdvanced Autolog§8] §c§oDisconnected you to avoid a trap§8§o! §8§o(§c§oTNT minecarts §7§owere rendered§c§o!§8§o)"), forceKick.get());
     }

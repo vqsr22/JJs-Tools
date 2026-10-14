@@ -18,6 +18,15 @@ import meteordevelopment.meteorclient.systems.modules.Module;
 import dev.jjstools.mixin.accessor.AnvilScreenHandlerAccessor;
 import meteordevelopment.meteorclient.systems.modules.Modules;
 import meteordevelopment.meteorclient.systems.modules.player.EXPThrower;
+import meteordevelopment.meteorclient.utils.player.Rotations;
+import net.minecraft.block.Block;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.block.Blocks;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 /**
  * @author Tas [0xTas] <root@0xTas.dev>
@@ -111,6 +120,34 @@ public class FastRename extends Module {
             .build()
     );
 
+    private final SettingGroup sgRecovery = settings.createGroup("Broken Anvil");
+
+    private final Setting<Boolean> reopenAnvil = sgRecovery.add(
+        new BoolSetting.Builder()
+            .name("reopen-anvil")
+            .description("When the anvil you are using breaks, open the one that drops into its place and carry on.")
+            .defaultValue(true)
+            .build()
+    );
+    private final Setting<Integer> reopenDelay = sgRecovery.add(
+        new IntSetting.Builder()
+            .name("reopen-delay")
+            .description("Ticks to wait after the anvil breaks before clicking the replacement. Long enough for the one above to finish falling.")
+            .visible(reopenAnvil::get)
+            .min(0).max(60)
+            .sliderRange(0, 20)
+            .defaultValue(4)
+            .build()
+    );
+    private final Setting<Boolean> reopenRotate = sgRecovery.add(
+        new BoolSetting.Builder()
+            .name("silent-rotate")
+            .description("Turn towards the anvil for the click without moving your view. Off sends the click as you are facing.")
+            .visible(reopenAnvil::get)
+            .defaultValue(true)
+            .build()
+    );
+
     /**
      * Size of the main inventory, hotbar included.
      *
@@ -122,6 +159,16 @@ public class FastRename extends Module {
     private int timer = 0;
     private boolean notified = false;
     private static final int ANVIL_OFFSET = 3;
+
+    /** How long to keep watching for a replacement before giving up, in ticks. */
+    private static final int REOPEN_WINDOW = 100;
+
+    private static BlockPos lastAnvilUsed;
+
+    private BlockPos anvilPos;
+    private boolean anvilBroke;
+    private int sinceBroke;
+    private int watchLeft;
 
     // See WorldMixin.java
     public boolean shouldMute() { return muteAnvils.get(); }
@@ -151,6 +198,7 @@ public class FastRename extends Module {
             if (pingOnDone.get()) mc.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, pingVolume.get().floatValue(), 1.0f);
         }
         notified = true;
+        forgetAnvil();
         mc.player.closeHandledScreen();
         if (disableOnDone.get()) this.toggle();
         if (enableExpThrower.get() && !Modules.get().isActive(EXPThrower.class)) Modules.get().get(EXPThrower.class).toggle();
@@ -163,6 +211,7 @@ public class FastRename extends Module {
             if (pingOnDone.get()) mc.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, pingVolume.get().floatValue(), 1.0f);
         }
         notified = true;
+        forgetAnvil();
         mc.player.closeHandledScreen();
         if (disableOnDone.get()) this.toggle();
     }
@@ -171,11 +220,134 @@ public class FastRename extends Module {
     public void onDeactivate() {
         timer = 0;
         notified = false;
+        forgetAnvil();
+    }
+
+    private void forgetAnvil() {
+        anvilPos = null;
+        anvilBroke = false;
+        sinceBroke = 0;
+        watchLeft = 0;
+    }
+
+
+    /**
+     * Remembers the last anvil you right clicked, whether or not the module is on.
+     *
+     * Called from InteractBlockMixin rather than Meteor's event so the position is already known
+     * when you switch the module on with the anvil screen in front of you, which is how it is
+     * usually switched on.
+     */
+    public static void onBlockUsed(BlockPos pos) {
+        if (isAnvilBlock(pos)) lastAnvilUsed = pos.toImmutable();
+    }
+
+    private static boolean isAnvilBlock(BlockPos pos) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.world == null) return false;
+
+        Block block = client.world.getBlockState(pos).getBlock();
+        return block == Blocks.ANVIL || block == Blocks.CHIPPED_ANVIL || block == Blocks.DAMAGED_ANVIL;
+    }
+
+    /**
+     * Opens the anvil that lands where the last one broke.
+     *
+     * Anvils are stacked so the next one falls into the gap, which takes a moment, hence the wait.
+     * The break is read from the block itself, never from the screen, because the screen is not a
+     * reliable signal in either direction: closing it yourself leaves the anvil standing, and the
+     * server leaves it open over a gap where the anvil used to be.
+     */
+    private void watchForReplacement() {
+        if (!reopenAnvil.get() || mc.player == null || mc.world == null) return;
+
+        // Pick up a different anvil if you opened one.
+        if (mc.currentScreen instanceof AnvilScreen && lastAnvilUsed != null
+            && !lastAnvilUsed.equals(anvilPos) && isAnvilBlock(lastAnvilUsed)) {
+            anvilPos = lastAnvilUsed;
+            anvilBroke = false;
+            sinceBroke = 0;
+            watchLeft = 0;
+        }
+
+        if (anvilPos == null) return;
+
+        boolean standing = isAnvilBlock(anvilPos);
+
+        if (!anvilBroke) {
+            if (standing) return;
+
+            anvilBroke = true;
+            sinceBroke = 0;
+            watchLeft = REOPEN_WINDOW;
+        }
+
+        if (!standing) {
+            /*
+             * Nothing closes the screen when the anvil under it is destroyed, so it is closed here.
+             * Left open, the renaming loop carries on shift clicking into a table that is not there
+             * and the first sign anything is wrong is a screen full of items that will not move.
+             */
+            if (mc.currentScreen instanceof AnvilScreen) mc.player.closeHandledScreen();
+
+            sinceBroke++;
+            if (--watchLeft <= 0) {
+                MsgUtil.sendModuleMsg("No anvil replaced the broken one§c..!", this.name);
+                forgetAnvil();
+            }
+            return;
+        }
+
+        // An anvil is standing there again. With the screen up, we are back in business.
+        if (mc.currentScreen instanceof AnvilScreen) {
+            anvilBroke = false;
+            return;
+        }
+
+        // Any other screen is yours, and clicking the anvil out from under it would be rude.
+        if (mc.currentScreen != null) return;
+
+        sinceBroke++;
+        if (--watchLeft <= 0) {
+            MsgUtil.sendModuleMsg("Could not open the replacement anvil§c..!", this.name);
+            forgetAnvil();
+            return;
+        }
+
+        if (sinceBroke < reopenDelay.get()) return;
+
+        clickAnvil(anvilPos);
+        sinceBroke = 0;
+    }
+
+    /**
+     * Clicks the anvil where it stands.
+     *
+     * The packet is sent straight out rather than through a raycast, so the click still lands when
+     * something is in the way. Range is still the server's to enforce.
+     */
+    private void clickAnvil(BlockPos pos) {
+        if (mc.player == null || mc.interactionManager == null) return;
+
+        BlockHitResult hit = new BlockHitResult(Vec3d.ofCenter(pos), Direction.UP, pos, false);
+
+        Runnable action = () -> {
+            mc.interactionManager.interactBlock(mc.player, Hand.MAIN_HAND, hit);
+            mc.player.swingHand(Hand.MAIN_HAND);
+        };
+
+        if (reopenRotate.get()) {
+            Rotations.rotate(Rotations.getYaw(pos), Rotations.getPitch(Vec3d.ofCenter(pos)), 100, action);
+        }
+        else action.run();
     }
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
         if (mc.player == null) return;
+
+        watchForReplacement();
+
         if (mc.currentScreen == null) {
             notified = false;
             return;

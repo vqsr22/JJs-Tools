@@ -1,6 +1,7 @@
 package dev.jjstools.mixin;
 
 import dev.jjstools.modules.AntiRocketPlace;
+import dev.jjstools.modules.FastRename;
 import dev.jjstools.tint.BoxColorTracker;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayerInteractionManager;
@@ -32,6 +33,10 @@ public class InteractBlockMixin {
          * API's UseBlockCallback, which would mean adding a dependency for one event.
          */
         BoxColorTracker.onBlockUsed(hitResult.getBlockPos());
+
+        // And for Fast Rename, which needs to know which anvil you are standing at so it can spot
+        // that one breaking and open whatever drops into the gap.
+        FastRename.onBlockUsed(hitResult.getBlockPos());
 
         if (AntiRocketPlace.shouldIgnoreBlock()) cir.setReturnValue(ActionResult.PASS);
     }
