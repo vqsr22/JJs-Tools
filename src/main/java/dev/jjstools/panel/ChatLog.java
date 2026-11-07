@@ -167,6 +167,13 @@ public final class ChatLog {
         }
     }
 
+    /** Forgets every whisper with everyone, and saves straight away. */
+    public static synchronized void clearAll() {
+        load();
+        CONTACTS.clear();
+        save();
+    }
+
     public static synchronized int unreadTotal() {
         load();
         int n = 0;

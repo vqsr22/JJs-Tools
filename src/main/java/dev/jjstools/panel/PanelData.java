@@ -68,8 +68,16 @@ public final class PanelData {
         MeteorClient.EVENT_BUS.subscribe(INSTANCE);
     }
 
+    /** A container broken where you can see it leaves the stash manager. */
+    @EventHandler
+    private void onBlockUpdate(meteordevelopment.meteorclient.events.world.BlockUpdateEvent event) {
+        StashStore.onBlockChanged(event.pos, event.oldState, event.newState);
+    }
+
     @EventHandler
     private void onTick(TickEvent.Post event) {
+        dev.jjstools.gui.jjtheme.JJGuiTheme.tick();
+        dev.jjstools.gui.MeteorFonts.tick();
         ChatLog.tick();
         SessionStats.tick();
         StashStore.tick();

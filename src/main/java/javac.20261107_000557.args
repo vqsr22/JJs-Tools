@@ -1,0 +1,6 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/gui/jjtheme/widgets/WJJWindow.java

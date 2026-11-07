@@ -65,6 +65,35 @@ public final class StashWalker {
         return true;
     }
 
+    /**
+     * Asks Baritone to walk somewhere for another feature, opening nothing at the end: onto the
+     * block itself, or just next to it. Returns false if Baritone is missing or refused.
+     */
+    public static boolean pathTo(BlockPos pos, boolean onIt) {
+        if (!baritoneInstalled()) return false;
+        try {
+            String goalClass = onIt ? "baritone.api.pathing.goals.GoalBlock" : "baritone.api.pathing.goals.GoalGetToBlock";
+            Object goal = Class.forName(goalClass).getConstructor(BlockPos.class).newInstance(pos);
+            Class.forName("baritone.api.process.ICustomGoalProcess")
+                .getMethod("setGoalAndPath", Class.forName("baritone.api.pathing.goals.Goal"))
+                .invoke(customGoalProcess(), goal);
+        } catch (Throwable e) {
+            return false;
+        }
+        noBreaking();
+        return true;
+    }
+
+    /** Whether Baritone is still walking somewhere. */
+    public static boolean isPathing() {
+        return pathing();
+    }
+
+    /** Stops whatever Baritone is doing, and puts its Allow Break back. */
+    public static void stopPath() {
+        cancel();
+    }
+
     /** Baritone's own Allow Break, as it was before the walk, to put back after. Null when not changed. */
     private static Boolean savedAllowBreak;
 

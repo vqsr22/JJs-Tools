@@ -806,7 +806,7 @@ public class PrinterGoBrrr extends Module {
         if (at != null && ticks - at < 100) return;
         said.put(message, ticks);
         if (said.size() > 256) said.values().removeIf(t -> ticks - t >= 100);
-        info(message);
+        info("%s", message);
     }
 
     private static String name(BlockState state) {

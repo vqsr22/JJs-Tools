@@ -1,0 +1,16 @@
+[Unit]
+Description=JJ's Tools stash sync server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=jjsync
+WorkingDirectory=/opt/jjs-sync
+# Put your token in /opt/jjs-sync/token.env as: JJS_TOKEN=your-long-random-token
+EnvironmentFile=/opt/jjs-sync/token.env
+ExecStart=/usr/bin/python3 /opt/jjs-sync/jjs-sync-server.py --port 8787 --data /opt/jjs-sync/stash-data
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

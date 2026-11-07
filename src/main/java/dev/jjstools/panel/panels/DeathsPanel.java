@@ -24,7 +24,7 @@ public class DeathsPanel extends Panel {
     private boolean confirmClear;
 
     public DeathsPanel() {
-        super("deaths", "Death Log", Items.SKELETON_SKULL.getDefaultStack(), 170, 120);
+        super("deaths", "death log", Items.SKELETON_SKULL.getDefaultStack(), 170, 120);
     }
 
     @Override
@@ -37,8 +37,8 @@ public class DeathsPanel extends Panel {
         List<DeathLog.Death> deaths = DeathLog.all();
         int bh = Math.max(16, ui.lineH() + 7);
 
-        int cw = ui.width("Sure? Clear all") + 14;
-        ui.button(x + w - cw, y, cw, bh, confirmClear ? "Sure? Clear all" : "Clear all", !deaths.isEmpty(), () -> {
+        int cw = Math.max(ui.width("sure?"), ui.width("clear all")) + 24;
+        ui.button(x + w - cw, y, cw, bh, confirmClear ? "sure?" : "clear all", !deaths.isEmpty(), () -> {
             if (confirmClear) {
                 DeathLog.clear();
                 confirmClear = false;
@@ -46,7 +46,7 @@ public class DeathsPanel extends Panel {
         });
         if (!deaths.isEmpty()) {
             DeathLog.Death last = deaths.get(0);
-            ui.text(ui.fit("Last: " + last.cause.title + ", " + ChatPanel.ago(last.time) + " ago", w - cw - 6), x, y + (bh - ui.lineH()) / 2 + 1, ui.fgDim());
+            ui.text(ui.fit("last: " + last.cause.title.toLowerCase(java.util.Locale.ROOT) + ", " + ChatPanel.ago(last.time) + " ago", w - cw - 6), x, y + (bh - ui.lineH()) / 2 + 1, ui.fgDim());
         }
 
         int ly = y + bh + 4;
@@ -58,7 +58,7 @@ public class DeathsPanel extends Panel {
         int off = ui.scrollArea(x + 1, ly + 1, w - 2, lh - 2, deaths.size() * card + 2, scroll, card);
         int cy = ly + 1 - off;
 
-        if (deaths.isEmpty()) ui.centredWrapped("No deaths recorded. Long may it last.", x, w, ly + lh / 2, ui.fgWellDim());
+        if (deaths.isEmpty()) ui.centredWrapped("no deaths", x, w, ly + lh / 2, ui.fgWellDim());
 
         for (DeathLog.Death d : deaths) {
             if (cy + card < ly || cy > ly + lh) {
@@ -69,7 +69,7 @@ public class DeathsPanel extends Panel {
             ui.item(icon(d.cause), x + 4, cy + 4);
 
             int tx = x + 24;
-            String cause = d.cause.title + (d.killer != null && !d.killer.isBlank() ? ": " + d.killer : "");
+            String cause = d.cause.title.toLowerCase(java.util.Locale.ROOT) + (d.killer != null && !d.killer.isBlank() ? ": " + d.killer : "");
             ui.text(ui.fit(cause, w - 40), tx, cy + 4, colour(ui, d.cause));
             boolean hide = dev.jjstools.panel.Prefs.get().hideCoords;
             String where = (hide ? "" : d.x + ", " + d.y + ", " + d.z + "  ") + dimension(d.dimension);
@@ -77,8 +77,7 @@ public class DeathsPanel extends Panel {
             String detail = WHEN.format(Instant.ofEpochMilli(d.time)) + "  -  " + (d.message == null ? "" : d.message);
             ui.text(ui.fit(detail, w - 40), tx, cy + 4 + lineStep * 2, ui.fgWellDim());
 
-            if (ui.hovered(x + 1, cy, w - 8, card)) ui.tooltip(hide ? "Right-click to remove" : "Click to copy " + d.x + " " + d.y + " " + d.z + ", right-click to remove");
-            if (!hide) ui.onClick(x + 1, cy, w - 8, card, 0, b -> MinecraftClient.getInstance().keyboard.setClipboard(d.x + " " + d.y + " " + d.z));
+                        if (!hide) ui.onClick(x + 1, cy, w - 8, card, 0, b -> MinecraftClient.getInstance().keyboard.setClipboard(d.x + " " + d.y + " " + d.z));
             ui.onClick(x + 1, cy, w - 8, card, 1, b -> DeathLog.remove(d));
             cy += card;
         }
@@ -121,9 +120,9 @@ public class DeathsPanel extends Panel {
 
     private static String dimension(String id) {
         if (id == null) return "";
-        if (id.contains("nether")) return "Nether";
-        if (id.contains("end")) return "End";
-        if (id.contains("overworld")) return "Overworld";
+        if (id.contains("nether")) return "nether";
+        if (id.contains("end")) return "end";
+        if (id.contains("overworld")) return "overworld";
         return id;
     }
 }

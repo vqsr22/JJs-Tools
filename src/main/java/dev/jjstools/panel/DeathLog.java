@@ -60,25 +60,36 @@ public final class DeathLog {
         loaded = true;
         loadedFrom = path;
         DEATHS.clear();
+        sorted = null;
         DEATHS.addAll(PanelFiles.read(path, new TypeToken<List<Death>>() {}.getType(), new ArrayList<Death>()));
+        sorted = null;
     }
+
+    private static List<Death> sorted;
+    private static int sortedSize = -1;
 
     public static synchronized List<Death> all() {
         load();
-        List<Death> list = new ArrayList<>(DEATHS);
-        list.sort((a, b) -> Long.compare(b.time, a.time));
-        return list;
+        if (sorted == null || sortedSize != DEATHS.size()) {
+            List<Death> list = new ArrayList<>(DEATHS);
+            list.sort((a, b) -> Long.compare(b.time, a.time));
+            sorted = java.util.Collections.unmodifiableList(list);
+            sortedSize = DEATHS.size();
+        }
+        return sorted;
     }
 
     public static synchronized void clear() {
         load();
         DEATHS.clear();
+        sorted = null;
         PanelFiles.write(path(), DEATHS);
     }
 
     public static synchronized void remove(Death death) {
         load();
         DEATHS.remove(death);
+        sorted = null;
         PanelFiles.write(path(), DEATHS);
     }
 
@@ -113,6 +124,8 @@ public final class DeathLog {
         if ((d.cause == Cause.Mob || d.cause == Cause.Player) && d.killer != null) d.cause = isPlayer(d.killer) ? Cause.Player : Cause.Mob;
 
         DEATHS.add(d);
+
+        sorted = null;
         PanelFiles.write(path(), DEATHS);
         SessionStats.death();
     }

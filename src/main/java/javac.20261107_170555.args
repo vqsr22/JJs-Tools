@@ -1,0 +1,6 @@
+-proc:none
+-sourcepath
+.
+-d
+/tmp/claude-0/-home-claude/cbdb0f0b-5851-5c86-82ee-82eb4fc4fd42/scratchpad/out
+dev/jjstools/panel/panels/ChatPanel.java

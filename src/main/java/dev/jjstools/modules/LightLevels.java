@@ -354,8 +354,7 @@ public class LightLevels extends Module {
     }
 
     private boolean on2b2t() {
-        ServerInfo server = mc.getCurrentServerEntry();
-        return server != null && server.address != null && server.address.toLowerCase(Locale.ROOT).contains("2b2t");
+        return dev.jjstools.util.JJUtil.on2b2t();
     }
 
     private class Square {

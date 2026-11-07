@@ -1,0 +1,9 @@
+-d
+/tmp/jc
+-proc:none
+-sourcepath
+.
+-Xmaxerrs
+5000
+dev/jjstools/panel/StashStore.java
+dev/jjstools/panel/StashSync.java

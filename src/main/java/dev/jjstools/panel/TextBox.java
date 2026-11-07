@@ -17,6 +17,8 @@ public final class TextBox {
     public int max = 256;
     public Runnable onEnter;
     public Runnable onChange;
+    /** Whether the text sits in the middle of the box rather than at its left. */
+    public boolean centred;
 
     public TextBox(String placeholder) {
         this.placeholder = placeholder;

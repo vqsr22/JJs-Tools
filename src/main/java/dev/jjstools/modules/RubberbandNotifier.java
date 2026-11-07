@@ -242,7 +242,7 @@ public class RubberbandNotifier extends Module {
 
         // Chat has to happen on the main thread; the numbers are already worked out.
         MutableText finished = msg;
-        mc.execute(() -> info(finished));
+        mc.execute(() -> info("%s", finished));
     }
 
     private static MutableText coloured(String text, SettingColor colour) {

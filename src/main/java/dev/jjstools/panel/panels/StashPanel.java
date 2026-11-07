@@ -45,9 +45,9 @@ import java.util.Map;
 public class StashPanel extends Panel {
     private enum Sort { Count, Name, Id }
 
-    private final TextBox search = new TextBox("Search (e.g. diamond sword, @minecraft)");
-    private final TextBox newName = new TextBox("Stash name");
-    private final TextBox radius = new TextBox("Radius");
+    private final TextBox search = new TextBox("search");
+    private final TextBox newName = new TextBox("name");
+    private final TextBox radius = new TextBox("radius");
 
     private final double[] gridScroll = { 0 };
     private final double[] listScroll = { 0 };
@@ -66,10 +66,11 @@ public class StashPanel extends Panel {
     private static final Map<Item, Integer> CATEGORY = new HashMap<>();
 
     public StashPanel() {
-        super("stash", "Stash Manager", Items.CHEST.getDefaultStack(), 320, 200);
+        super("stash", "stash manager", Items.CHEST.getDefaultStack(), 320, 200);
         newName.max = 40;
         newName.onEnter = this::create;
         radius.max = 7;
+        radius.centred = true;
         radius.onEnter = this::applyRadius;
     }
 
@@ -130,60 +131,42 @@ public class StashPanel extends Panel {
             return;
         }
 
-        // Header: which stash, where it is, and setting it up.
+        // Header: which stash, and setting it up; five the same width, across the whole panel.
+        int gapX = 4;
+        int each = (w - gapX * 4) / 5;
         int hx = x;
-        String label = stash.name;
-        int pw = Math.max(90, Math.min(180, ui.width(label) + 16));
-        ui.button(hx, y, pw, bh, label, () -> picking = !picking);
-        hx += pw + 4;
-        int nw = ui.width("New") + 14;
-        ui.button(hx, y, nw, bh, "New", () -> {
+        int pw = each;
+        ui.button(hx, y, pw, bh, stash.name, () -> picking = !picking);
+        hx += each + gapX;
+        ui.button(hx, y, each, bh, "new", () -> {
             naming = true;
             newName.set("");
             ui.focus = newName;
         });
-        hx += nw + 4;
-        int sw = ui.width("Set location here") + 14;
-        boolean set = ui.button(hx, y, sw, bh, "Set location here", MinecraftClient.getInstance().player != null, () -> StashStore.setLocationHere(stash));
-        if (set) ui.tooltip("Centres this stash where you are standing. Every container opened within the radius is recorded.");
-        hx += sw + 6;
-        ui.text("Radius", hx, y + (bh - ui.lineH()) / 2 + 1, ui.fgDim());
-        hx += ui.width("Radius") + 4;
-        int rw = ui.width("000000") + 12;
-        ui.textBox(radius, hx, y, rw, bh);
-        hx += rw + 3;
-        ui.button(hx, y, ui.width("Set") + 12, bh, "Set", this::applyRadius);
+        hx += each + gapX;
+        ui.button(hx, y, each, bh, "set location", MinecraftClient.getInstance().player != null, () -> StashStore.setLocationHere(stash));
+        hx += each + gapX;
+        ui.textBox(radius, hx, y, each, bh);
+        hx += each + gapX;
+        ui.button(hx, y, x + w - hx, bh, "set radius", this::applyRadius);
 
-        boolean hideCoords = Prefs.get().hideCoords;
-        int iy = y + bh + 4;
-        String where = stash.located
-            ? (hideCoords ? "" : "centre " + stash.x + ", " + stash.z + " in ") + shortDimension(stash.dimension) + " on " + stash.server
-            : "no location yet: stand in your stash and press Set location here";
-        long updated = stash.lastUpdated();
-        String info = stash.count() + " containers" + (updated > 0 ? "  -  updated " + ChatPanel.ago(updated) + " ago" : "") + "  -  " + where;
-        ui.small(ui.fitSmall(info, w), x, iy, ui.fgDim());
-        int distanceY = iy + ui.smallH() + 2;
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (stash.located && mc.player != null) {
-            double dx = mc.player.getX() - stash.x, dz = mc.player.getZ() - stash.z;
-            int dist = (int) Math.sqrt(dx * dx + dz * dz);
-            boolean inside = dist <= stash.radius;
-            String status = inside ? "In this stash, " + Ui.grouped(dist) + " blocks from its centre: containers you open are recorded"
-                : Ui.grouped(dist) + " blocks away, outside its radius";
-            ui.small(ui.fitSmall(status, w), x, distanceY, inside ? Ui.GREEN : ui.fgDim());
-        }
-        int top = distanceY + ui.smallH() + 5;
+        int top = y + bh + 5;
 
         // Kinds of item, as the creative menu's tabs.
         int tab = 22;
         int tx = x;
+        Prefs.Data p = Prefs.get();
+        // Side by side buttons are all the same width, with room to spare, as monkeytype's are.
+        int cw = Math.max(ui.width("hide amounts"), ui.width("shulkers: contents")) + 24;
+        // Room kept for the other tab and the three buttons after the tabs.
+        int tabsEnd = x + w - (cw * 3 + 8 + 6) - (tab + 2);
         ui.iconButton(tx, top, tab, Items.COMPASS.getDefaultStack(), category == -1, "Everything", () -> {
             category = -1;
             gridScroll[0] = 0;
         });
         tx += tab + 2;
         if (groups != null) {
-            for (int i = 0; i < groups.size() && tx + tab <= x + w - (ui.width("Clear outlines") + ui.width("Shulkers: contents") + 40); i++) {
+            for (int i = 0; i < groups.size() && tx + tab <= tabsEnd; i++) {
                 ItemGroup g = groups.get(i);
                 int index = i;
                 ui.iconButton(tx, top, tab, g.getIcon(), category == i, g.getDisplayName().getString(), () -> {
@@ -193,33 +176,31 @@ public class StashPanel extends Panel {
                 tx += tab + 2;
             }
         }
-        // Right of the tabs: how shulker boxes count, and clearing the outlines in the world.
-        Prefs.Data p = Prefs.get();
-        int cw = ui.width("Clear outlines") + 14;
-        int mw = ui.width("Shulkers: contents") + 14;
-        int right = x + w;
-        boolean clearHover = ui.button(right - cw, top + 2, cw, tab - 4, "Clear outlines", !PanelData.highlighted.isEmpty(), PanelData.highlighted::clear);
-        if (clearHover) ui.tooltip("Takes every stash outline out of the world.");
-        right -= cw + 4;
-        boolean modeHover = ui.button(right - mw, top + 2, mw, tab - 4, p.stashContents ? "Shulkers: contents" : "Shulkers: boxes", () -> {
+        int otherIndex = groups == null ? 0 : groups.size();
+        ui.iconButton(tx, top, tab, Items.BARRIER.getDefaultStack(), category == otherIndex, "Other", () -> {
+            category = otherIndex;
+            gridScroll[0] = 0;
+        });
+        tx += tab + 6;
+
+        // After the tabs, filling the rest of the row in three equal parts: how shulker boxes count,
+        // clearing the outlines in the world, and hiding the amounts on the grid.
+        int third = Math.max(cw / 2, (x + w - tx - 8) / 3);
+        ui.button(tx, top + 2, third, tab - 4, p.stashContents ? "shulkers: contents" : "shulkers: boxes", () -> {
             p.stashContents = !p.stashContents;
             selected = null;
             menuFor = null;
             Prefs.save();
         });
-        if (modeHover) ui.tooltip(p.stashContents ? "Counting what is inside shulker boxes. Click to count the boxes themselves." : "Counting shulker boxes as boxes. Click to count what is inside them.");
-        int tabsEnd = right - mw - 6;
-
-        int otherIndex = groups == null ? 0 : groups.size();
-        if (tx + tab <= tabsEnd) {
-            ui.iconButton(tx, top, tab, Items.BARRIER.getDefaultStack(), category == otherIndex, "Other", () -> {
-                category = otherIndex;
-                gridScroll[0] = 0;
-            });
-        }
+        ui.button(tx + third + 4, top + 2, third, tab - 4, "clear esp", !PanelData.highlighted.isEmpty(), PanelData.highlighted::clear);
+        int amountsX = tx + (third + 4) * 2;
+        ui.toggle(amountsX, top + 2, x + w - amountsX, tab - 4, "hide amounts", p.stashHideAmounts, () -> {
+            p.stashHideAmounts = !p.stashHideAmounts;
+            Prefs.save();
+        });
 
         int gridY = top + tab + 4;
-        String categoryName = category == -1 ? "Everything" : category < (groups == null ? 0 : groups.size()) ? groups.get(category).getDisplayName().getString() : "Other";
+        String categoryName = (category == -1 ? "everything" : category < (groups == null ? 0 : groups.size()) ? groups.get(category).getDisplayName().getString() : "other").toLowerCase(Locale.ROOT);
         ui.text(categoryName, x, gridY, ui.fg());
         gridY += ui.lineH() + 3;
 
@@ -236,7 +217,8 @@ public class StashPanel extends Panel {
         StashStore.Total chosen = null;
         for (StashStore.Total t : all) if (t.kind().equals(selected)) chosen = t;
         int detailH = chosen == null ? 0 : Math.min(h / 2, (bh + 3) * 2 + ui.lineH() * 2 + 8 + Math.min(5, chosen.where().size()) * (bh + 2));
-        int gridH = h - (gridY - y) - bottomH - (detailH > 0 ? detailH + 4 : 0);
+        // A gap between the items and the search and ignore row under them.
+        int gridH = h - (gridY - y) - bottomH - 8 - (detailH > 0 ? detailH + 4 : 0);
 
         drawGrid(ui, x, gridY, w, Math.max(40, gridH), shown, chosen);
 
@@ -246,46 +228,45 @@ public class StashPanel extends Panel {
         int by = y + h - bottomH;
         Prefs.Data prefs = Prefs.get();
         Sort sort = sortOf(prefs.stashSort);
-        String sortLabel = "Sort: " + (sort == Sort.Id ? "ID" : sort.name()) + " " + (prefs.stashSortReverse ? Ui.UP : Ui.DOWN);
-        int sortW = ui.width("Sort: Count " + Ui.DOWN) + 14;
-        int inW = ui.width("Ignore names") + 12;
-        int ieW = ui.width("Ignore enchants") + 12;
-        int itW = ui.width("Ignore trims") + 12;
-        int bx = x + w - sortW - 4 - itW - 2 - ieW - 2 - inW - 4;
+        String sortLabel = "sort: " + sort.name().toLowerCase(Locale.ROOT) + " " + (prefs.stashSortReverse ? Ui.UP : Ui.DOWN);
+        int even = Math.max(ui.width("ignore enchants"), Math.max(ui.width("ignore names"), ui.width("ignore trims"))) + 20;
+        // Narrowed together if the panel is too small for them all at full width.
+        int sortW = ui.width("sort: count " + Ui.DOWN) + 20;
+        even = Math.max(40, Math.min(even, (w - 90 - sortW) / 3 - 3));
+        int inW = even, ieW = even, itW = even;
+        int bx = x + w - sortW - 3 - itW - 3 - ieW - 3 - inW - 4;
         ui.textBox(search, x, by, bx - x, bh);
-        boolean namesHover = ui.toggle(bx + 4, by, inW, bh, "Ignore names", prefs.stashNamesIgnored, () -> {
+        ui.toggle(bx + 4, by, inW, bh, "ignore names", prefs.stashNamesIgnored, () -> {
             prefs.stashNamesIgnored = !prefs.stashNamesIgnored;
             selected = null;
             menuFor = null;
             Prefs.save();
         });
-        if (namesHover) ui.tooltip("Counts renamed items together with the rest of their kind.");
-        boolean enchHover = ui.toggle(bx + 4 + inW + 2, by, ieW, bh, "Ignore enchants", prefs.stashEnchantsIgnored, () -> {
+        ui.toggle(bx + 4 + inW + 3, by, ieW, bh, "ignore enchants", prefs.stashEnchantsIgnored, () -> {
             prefs.stashEnchantsIgnored = !prefs.stashEnchantsIgnored;
             selected = null;
             menuFor = null;
             Prefs.save();
         });
-        if (enchHover) ui.tooltip("Counts enchanted items together whatever their enchantments. Enchanted and plain items are still kept apart.");
-        boolean trimHover = ui.toggle(bx + 4 + inW + 2 + ieW + 2, by, itW, bh, "Ignore trims", prefs.stashTrimsIgnored, () -> {
+        ui.toggle(bx + 4 + inW + 3 + ieW + 3, by, itW, bh, "ignore trims", prefs.stashTrimsIgnored, () -> {
             prefs.stashTrimsIgnored = !prefs.stashTrimsIgnored;
             selected = null;
             menuFor = null;
             Prefs.save();
         });
-        if (trimHover) ui.tooltip("Counts trimmed armour together whatever its trim. Trimmed and plain armour are still kept apart.");
-        boolean hover = ui.button(x + w - sortW, by, sortW, bh, sortLabel, () -> {
+        ui.button(x + w - sortW, by, sortW, bh, sortLabel, () -> {
             prefs.stashSort = switch (sort) {
                 case Count -> "Name";
                 case Name -> "Id";
                 case Id -> "Count";
             };
         });
-        if (hover) ui.tooltip("Click to change what it sorts by; right-click to flip the order.");
         ui.onClick(x + w - sortW, by, sortW, bh, 1, b -> prefs.stashSortReverse = !prefs.stashSortReverse);
 
-        String summary = "Showing " + shown.size() + " of " + all.size() + " item types  -  total " + Ui.grouped(totalItems) + " items"
-            + "  -  click an item for where it is, right-click for more";
+        long updated = stash.lastUpdated();
+        String summary = stash.count() + " containers" + (updated > 0 ? "  \u00B7  updated " + ChatPanel.ago(updated) + " ago" : "")
+            + "  \u00B7  " + Ui.grouped(totalItems) + " items" + (stash.located ? "" : "  \u00B7  no location set")
+            + (ControlPanel.syncMode() == ControlPanel.SyncMode.Server ? "  \u00B7  " + dev.jjstools.panel.StashSync.status() : "");
         ui.small(ui.fitSmall(summary, w), x, by + bh + 4, ui.fgDim());
 
         if (picking) drawPicker(ui, x, y + bh, Math.max(pw, 160), Math.min(h - bh, 10 * (bh + 2) + 6), bh);
@@ -299,24 +280,24 @@ public class StashPanel extends Panel {
     private void drawNoStash(Ui ui, int x, int y, int w, int h, int bh, boolean none) {
         int cy = y + 6;
         if (none) {
-            ui.text("No stashes yet.", x, cy, ui.fg());
+            ui.text("no stashes yet", x, cy, ui.fg());
             cy += ui.lineH() + 4;
-            for (String line : ui.wrap("Stand in your stash, give it a name and press Create. Every chest, barrel and shulker box you open within "
+            for (String line : ui.wrap("Stand in your stash, give it a name and press create. Every chest, barrel and shulker box you open within "
                 + ControlPanel.newStashRadius() + " blocks of here is then recorded. Stash files live in "
-                + StashStore.folder() + "; set Stash Folder in Control Panel's module settings to a synced folder to share them.", w)) {
+                + StashStore.folder() + ". Set stash-folder in the Control Panel module to a synced folder to share them.", w)) {
                 ui.text(line, x, cy, ui.fgDim());
                 cy += ui.lineH() + 2;
             }
         } else {
-            ui.text("New stash, centred where you are standing:", x, cy, ui.fg());
+            ui.text("new stash, centred where you are standing", x, cy, ui.fg());
             cy += ui.lineH() + 4;
         }
         cy += 4;
-        int cw = ui.width("Create") + 16;
+        int cw = Math.max(ui.width("create"), ui.width("cancel")) + 24;
         ui.textBox(newName, x, cy, Math.min(240, w - cw * 2 - 8), bh);
         int bx = x + Math.min(240, w - cw * 2 - 8) + 4;
-        ui.button(bx, cy, cw, bh, "Create", !newName.text.isBlank() && MinecraftClient.getInstance().player != null, this::create);
-        if (!none) ui.button(bx + cw + 4, cy, cw, bh, "Cancel", () -> naming = false);
+        ui.button(bx, cy, cw, bh, "create", !newName.text.isBlank() && MinecraftClient.getInstance().player != null, this::create);
+        if (!none) ui.button(bx + cw + 4, cy, cw, bh, "cancel", () -> naming = false);
     }
 
     private void create() {
@@ -365,7 +346,7 @@ public class StashPanel extends Panel {
         }
         StashStore.Stash current = active();
         if (current != null) {
-            ui.button(x + 3, py, w - 6 - 8, bh, "Delete " + current.name, () -> {
+            ui.button(x + 3, py, w - 6 - 8, bh, "delete " + current.name, () -> {
                 StashStore.delete(current);
                 Prefs.get().activeStash = null;
                 picking = false;
@@ -382,7 +363,23 @@ public class StashPanel extends Panel {
         return Sort.Count;
     }
 
+    private List<StashStore.Total> filterFor;
+    private String filterKey;
+    private List<StashStore.Total> filtered = List.of();
+
+    /** The filtered list, worked out again only when the totals, search, tab or order change. */
     private List<StashStore.Total> filter(List<StashStore.Total> all) {
+        Prefs.Data p = Prefs.get();
+        String key = search.text + "|" + category + "|" + p.stashSort + "|" + p.stashSortReverse;
+        if (all != filterFor || !key.equals(filterKey)) {
+            filterFor = all;
+            filterKey = key;
+            filtered = filterNow(all);
+        }
+        return filtered;
+    }
+
+    private List<StashStore.Total> filterNow(List<StashStore.Total> all) {
         String q = search.text.trim().toLowerCase(Locale.ROOT);
         String namespace = null;
         if (q.startsWith("@")) {
@@ -418,6 +415,15 @@ public class StashPanel extends Panel {
         return list;
     }
 
+    /**
+     * The grid of items.
+     *
+     * Drawn in passes, all the slots, then all the items, then the shulker extras, then the
+     * counts, rather than slot by slot. The game keeps everything drawn in layers and checks each
+     * new thing against what is already there, so the grid used to cost a new layer per shulker
+     * and three boxes per slot. Done this way it is a handful of strips and a few layers however
+     * big the stash is, and one click area for the whole grid.
+     */
     private void drawGrid(Ui ui, int x, int y, int w, int h, List<StashStore.Total> shown, StashStore.Total chosen) {
         ui.well(x, y, w, h);
         int cols = Math.max(1, (w - 4 - 8) / 18);
@@ -433,41 +439,73 @@ public class StashPanel extends Panel {
             ui.centredWrapped("Nothing here yet. Open the containers in your stash to fill it.", x, w, y + h / 2, ui.fgWellDim());
         }
 
-        for (int i = 0; i < shown.size(); i++) {
-            int sx = gx + (i % cols) * 18;
-            int sy = gy + (i / cols) * 18;
-            if (sy + 18 < y || sy > y + h) continue;
+        // Only the rows that can be seen.
+        int firstRow = Math.max(0, (y - gy) / 18);
+        int lastRow = Math.min(rows, (y + h - gy) / 18 + 1);
+        int from = Math.min(shown.size(), firstRow * cols);
+        int to = Math.min(shown.size(), lastRow * cols);
+        if (from < to) {
+            ui.slotGrid(gx, gy + firstRow * 18, cols, to - from);
 
-            StashStore.Total t = shown.get(i);
-            ui.slot(sx, sy);
-            ui.item(t.sample(), sx + 1, sy + 1);
+            for (int i = from; i < to; i++) {
+                ui.item(shown.get(i).sample(), gx + (i % cols) * 18 + 1, gy + (i / cols) * 18 + 1);
+            }
             // Storage GUI Tweaks' icon and fill bar on shulker boxes, as in an inventory.
-            dev.jjstools.modules.StorageGuiTweaks.slotExtras(ui.ctx, t.sample(), sx + 1, sy + 1);
-            ui.itemCount(t.sample(), sx + 1, sy + 1, Ui.shortCount(t.count()));
-            if (t == chosen) {
-                ui.fill(sx, sy, 18, 1, ui.accent());
-                ui.fill(sx, sy + 17, 18, 1, ui.accent());
-                ui.fill(sx, sy, 1, 18, ui.accent());
-                ui.fill(sx + 17, sy, 1, 18, ui.accent());
+            for (int i = from; i < to; i++) {
+                dev.jjstools.modules.StorageGuiTweaks.slotExtras(ui.ctx, shown.get(i).sample(), gx + (i % cols) * 18 + 1, gy + (i / cols) * 18 + 1);
+                ui.added(2);
             }
-            if (ui.hovered(sx, sy, 18, 18)) {
-                ui.fill(sx + 1, sy + 1, 16, 16, 0x80FFFFFF);
-                ui.itemTooltip(t.sample(), tooltip(t));
+            for (int i = from; i < to && !Prefs.get().stashHideAmounts; i++) {
+                StashStore.Total t = shown.get(i);
+                ui.itemCount(t.sample(), gx + (i % cols) * 18 + 1, gy + (i / cols) * 18 + 1, Ui.shortCount(t.count()));
             }
-            ui.onClick(sx, sy, 18, 18, 0, b -> {
+        }
+
+        int chosenAt = chosen == null ? -1 : shown.indexOf(chosen);
+        if (chosenAt >= from && chosenAt < to) {
+            int sx = gx + (chosenAt % cols) * 18;
+            int sy = gy + (chosenAt / cols) * 18;
+            ui.fill(sx, sy, 18, 1, ui.accent());
+            ui.fill(sx, sy + 17, 18, 1, ui.accent());
+            ui.fill(sx, sy, 1, 18, ui.accent());
+            ui.fill(sx + 17, sy, 1, 18, ui.accent());
+        }
+
+        int under = slotUnder(ui.mx, ui.my, x, y, w, h, gx, gy, cols, shown.size());
+        if (under >= 0) {
+            StashStore.Total t = shown.get(under);
+            ui.fill(gx + (under % cols) * 18 + 1, gy + (under / cols) * 18 + 1, 16, 16, 0x80FFFFFF);
+            ui.itemTooltip(t.sample(), tooltip(t));
+        }
+
+        ui.onClick(x + 1, y + 1, w - 2, h - 2, -1, b -> {
+            int i = slotUnder(ui.mx, ui.my, x, y, w, h, gx, gy, cols, shown.size());
+            if (i < 0) return;
+            StashStore.Total t = shown.get(i);
+            if (b == 0) {
                 selected = t.kind();
                 listScroll[0] = 0;
                 menuFor = null;
                 highlight(t);
                 if (shift()) walk(t);
-            });
-            ui.onClick(sx, sy, 18, 18, 1, b -> {
+            } else if (b == 1) {
                 menuFor = t.kind();
                 menuX = ui.mx;
                 menuY = ui.my;
-            });
-        }
+            }
+        });
         ui.unclip();
+    }
+
+    /** Which item in the grid is at a point, or -1. */
+    private static int slotUnder(int mx, int my, int x, int y, int w, int h, int gx, int gy, int cols, int size) {
+        if (mx < x + 1 || my < y + 1 || mx >= x + w - 1 || my >= y + h - 1) return -1;
+        if (mx < gx || my < gy) return -1;
+        int col = (mx - gx) / 18;
+        int row = (my - gy) / 18;
+        if (col >= cols) return -1;
+        int i = row * cols + col;
+        return i < size ? i : -1;
     }
 
     private static boolean shift() {
@@ -479,17 +517,17 @@ public class StashPanel extends Panel {
         List<Text> lines = new ArrayList<>();
         lines.add(t.sample().getName());
         List<Text> enchants = enchantments(t.sample());
-        if (StashStore.ignoreEnchantments && !enchants.isEmpty()) lines.add(Text.literal("Enchanted, any enchantments").formatted(Formatting.GRAY));
+        if (StashStore.ignoreEnchantments && !enchants.isEmpty()) lines.add(Text.literal("any enchantments").formatted(Formatting.GRAY));
         else lines.addAll(enchants);
         int max = Math.max(1, t.sample().getMaxCount());
         double stacks = t.count() / (double) max;
         double shulkers = t.count() / (27.0 * max);
         double dubs = t.count() / (54.0 * 27 * max);
-        lines.add(Text.literal("Total: ").formatted(Formatting.GRAY).append(Text.literal(Ui.grouped(t.count())).formatted(Formatting.GREEN)));
-        lines.add(Text.literal("Stacks: ").formatted(Formatting.GRAY).append(Text.literal(stacks(t.count(), max)).formatted(Formatting.WHITE)));
-        lines.add(Text.literal("Shulkers: ").formatted(Formatting.GRAY).append(Text.literal(Ui.decimal(shulkers)).formatted(Formatting.WHITE)));
-        lines.add(Text.literal("Dubs: ").formatted(Formatting.GRAY).append(Text.literal(Ui.decimal(dubs)).formatted(Formatting.WHITE)));
-        lines.add(Text.literal("In " + t.where().size() + " container" + (t.where().size() == 1 ? "" : "s")).formatted(Formatting.YELLOW));
+        lines.add(Text.literal("total: ").formatted(Formatting.GRAY).append(Text.literal(Ui.grouped(t.count())).formatted(Formatting.GREEN)));
+        lines.add(Text.literal("stacks: ").formatted(Formatting.GRAY).append(Text.literal(stacks(t.count(), max)).formatted(Formatting.WHITE)));
+        lines.add(Text.literal("shulkers: ").formatted(Formatting.GRAY).append(Text.literal(Ui.decimal(shulkers)).formatted(Formatting.WHITE)));
+        lines.add(Text.literal("dubs: ").formatted(Formatting.GRAY).append(Text.literal(Ui.decimal(dubs)).formatted(Formatting.WHITE)));
+        lines.add(Text.literal("in " + t.where().size() + " container" + (t.where().size() == 1 ? "" : "s")).formatted(Formatting.YELLOW));
         lines.add(Text.literal(Registries.ITEM.getId(t.item()).toString()).formatted(Formatting.DARK_GRAY));
         return lines;
     }
@@ -500,7 +538,7 @@ public class StashPanel extends Panel {
         long whole = count / max;
         long rest = count % max;
         if (whole == 0) return String.valueOf(rest);
-        String s = Ui.grouped(whole) + (whole == 1 ? " Stack" : " Stacks");
+        String s = Ui.grouped(whole) + (whole == 1 ? " stack" : " stacks");
         return rest == 0 ? s : s + " + " + rest;
     }
 
@@ -521,7 +559,7 @@ public class StashPanel extends Panel {
     private void drawMenu(Ui ui, int x, int y, int w, int h, StashStore.Total t, int bh) {
         StashStore.Holding best = StashStore.best(t, ControlPanel.walkDistance());
         boolean hide = Prefs.get().hideCoords;
-        String[] labels = { "Walk to best and open", "Show where it is", "Outline in the world", "Clear outlines", hide ? null : "Copy best coordinates" };
+        String[] labels = { "baritone walk", "show locations", "esp containers", "clear esp", hide ? null : "copy coords" };
 
         int mw = 0;
         int count = 0;
@@ -583,21 +621,21 @@ public class StashPanel extends Panel {
         StashStore.Holding best = StashStore.best(t, ControlPanel.walkDistance());
         int by = cy + Math.max(18, ui.lineH() * 2 + 4) + 4;
         int bx = cx;
-        String walkLabel = StashWalker.target() != null ? "Stop walking" : "Walk to best";
-        int ww = ui.width("Walk to best") + 16;
+        String walkLabel = StashWalker.target() != null ? "stop walking" : "baritone walk";
+        int ww = Math.max(Math.max(ui.width("stop walking"), ui.width("baritone walk")), Math.max(ui.width("esp containers"), ui.width("clear esp"))) + 24;
         boolean hover = ui.button(bx, by, ww, bh, walkLabel, best != null, () -> {
             if (StashWalker.target() != null) StashWalker.stop();
             else walk(t);
         });
-        if (hover && best != null) ui.tooltip("Walks with Baritone to " + (Prefs.get().hideCoords ? "the best container" : best.container().pos().toShortString()) + " (" + Ui.grouped(best.count()) + " there) and opens it.");
+        if (hover && best != null) ui.tooltip("Walks to " + (Prefs.get().hideCoords ? "the best container" : best.container().pos().toShortString()) + " (" + Ui.grouped(best.count()) + " there) and opens it.");
         bx += ww + 4;
-        int hw = ui.width("Clear outlines") + 16;
-        ui.button(bx, by, hw, bh, PanelData.highlighted.isEmpty() ? "Outline all" : "Clear outlines", () -> {
+        int hw = ww;
+        ui.button(bx, by, hw, bh, PanelData.highlighted.isEmpty() ? "esp containers" : "clear esp", () -> {
             if (PanelData.highlighted.isEmpty()) highlight(t);
             else PanelData.highlighted.clear();
         });
         bx += hw + 4;
-        ui.button(bx, by, ui.width("Close") + 16, bh, "Close", () -> {
+        ui.button(bx, by, ww, bh, "close", () -> {
             selected = null;
             PanelData.highlighted.clear();
         });
@@ -620,14 +658,14 @@ public class StashPanel extends Panel {
             String dist = mc.player == null ? "" : Ui.grouped((long) Math.sqrt(mc.player.getBlockPos().getSquaredDistance(pos))) + "m";
             boolean isBest = best != null && hold == best;
             String at = Prefs.get().hideCoords ? "" : " at " + pos.getX() + ", " + pos.getY() + ", " + pos.getZ();
-            String line = (isBest ? "Best: " : "") + hold.container().kind + at
+            String line = (isBest ? "best  \u00B7  " : "") + hold.container().kind.toLowerCase(Locale.ROOT) + at
                 + "  -  " + Ui.grouped(hold.count()) + "  -  " + dist
                 + (hold.container().by != null ? "  -  by " + hold.container().by + " " + ChatPanel.ago(hold.container().updated) + " ago" : "");
-            int goW = ui.width("Go") + 12;
-            int fw = ui.width("Forget") + 12;
+            int goW = Math.max(ui.width("go"), ui.width("forget")) + 20;
+            int fw = goW;
             ui.text(ui.fit(line, w - goW - fw - 16), x + 6, ry + (bh - ui.lineH()) / 2 + 1, isBest ? Ui.GREEN : ui.fgWell());
-            ui.button(x + w - goW - fw - 12, ry, goW, bh, "Go", () -> StashWalker.go(pos));
-            ui.button(x + w - fw - 8, ry, fw, bh, "Forget", () -> {
+            ui.button(x + w - goW - fw - 12, ry, goW, bh, "go", () -> StashWalker.go(pos));
+            ui.button(x + w - fw - 8, ry, fw, bh, "forget", () -> {
                 if (stash != null) StashStore.forget(stash, hold.container());
             });
             ry += step;

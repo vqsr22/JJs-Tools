@@ -90,6 +90,14 @@ public final class StashStore {
         transient long changedAt;
         /** Bumped on every change, so worked-out totals know when to work themselves out again. */
         public transient int revision;
+        /** Containers changed here and not yet sent to the sync server, and whether its settings were. */
+        transient java.util.Set<String> toSend;
+        transient boolean settingsToSend;
+
+        java.util.Set<String> toSend() {
+            if (toSend == null) toSend = new java.util.HashSet<>();
+            return toSend;
+        }
 
         public int count() {
             int n = 0;
@@ -104,7 +112,10 @@ public final class StashStore {
         }
 
         public boolean contains(String server, String dimension, BlockPos pos) {
-            if (!located || !this.server.equalsIgnoreCase(server) || !this.dimension.equals(dimension)) return false;
+            // The server address only has to match when that setting asks for it: players joining
+            // through ZenithProxy, or by different addresses, are all on the same server really.
+            if (!located || !this.dimension.equals(dimension)) return false;
+            if (!ControlPanel.stashAnyServer() && !this.server.equalsIgnoreCase(server)) return false;
             double dx = pos.getX() - x, dz = pos.getZ() - z;
             return dx * dx + dz * dz <= (double) radius * radius;
         }
@@ -130,9 +141,8 @@ public final class StashStore {
                 stored = enchanted(stack.get(DataComponentTypes.STORED_ENCHANTMENTS)) ? Boolean.TRUE : null;
             }
             Object name = ignoreNames ? null : stack.get(DataComponentTypes.CUSTOM_NAME);
-            // Any trim counts as the same when trims are ignored, but trimmed and plain armour are kept apart.
-            Object trim = stack.get(DataComponentTypes.TRIM);
-            if (ignoreTrims && trim != null) trim = Boolean.TRUE;
+            // Ignoring trims counts trimmed and plain armour together, whatever the trim.
+            Object trim = ignoreTrims ? null : stack.get(DataComponentTypes.TRIM);
             return new Kind(stack.getItem(), enchantments, stored, stack.get(DataComponentTypes.POTION_CONTENTS),
                 shulker ? stack.get(DataComponentTypes.CONTAINER) : null, name, trim);
         }
@@ -167,10 +177,14 @@ public final class StashStore {
 
     // Files
 
-    /** The folder stashes are kept in: the one set in Control Panel's settings, or JJ's Tools' own. */
+    /**
+     * The folder stashes are kept in: the one set in Control Panel's settings when syncing by
+     * folder, otherwise JJ's Tools' own (where the server's copies are kept too, for when it
+     * cannot be reached).
+     */
     public static Path folder() {
         String set = ControlPanel.syncFolder();
-        if (set != null && !set.isBlank()) {
+        if (ControlPanel.syncMode() == ControlPanel.SyncMode.Folder && set != null && !set.isBlank()) {
             try {
                 return Path.of(set.trim());
             } catch (Exception ignored) {
@@ -241,6 +255,7 @@ public final class StashStore {
     public static synchronized void delete(Stash s) {
         ensureLoaded();
         STASHES.remove(s.name.toLowerCase(Locale.ROOT));
+        if (ControlPanel.syncMode() == ControlPanel.SyncMode.Server) StashSync.queueDelete(s.name);
         try {
             if (s.file != null) Files.deleteIfExists(s.file);
         } catch (Exception e) {
@@ -259,12 +274,14 @@ public final class StashStore {
         s.dimension = mc.world.getRegistryKey().getValue().toString();
         s.located = true;
         s.metaChanged = System.currentTimeMillis();
+        s.settingsToSend = true;
         changed(s);
     }
 
     public static synchronized void setRadius(Stash s, int radius) {
         s.radius = Math.max(16, Math.min(radius, 1_000_000));
         s.metaChanged = System.currentTimeMillis();
+        s.settingsToSend = true;
         changed(s);
     }
 
@@ -274,6 +291,7 @@ public final class StashStore {
         c.items = new ArrayList<>();
         c.decoded = null;
         c.updated = System.currentTimeMillis();
+        for (Map.Entry<String, Container> e : s.containers.entrySet()) if (e.getValue() == c) s.toSend().add(e.getKey());
         changed(s);
     }
 
@@ -366,6 +384,119 @@ public final class StashStore {
         }
     }
 
+    // Syncing with a server
+
+    /** Stashes already sent to the server whole this session, after finding it did not have them. */
+    private static final java.util.Set<String> uploaded = new java.util.HashSet<>();
+
+    /** Takes in what the last round brought back, and starts the next when it is due. */
+    private static void serverTick() {
+        StashSync.Result r;
+        while ((r = StashSync.RESULTS.poll()) != null) take(r);
+        if (!StashSync.due()) return;
+
+        List<StashSync.Push> pushes = new ArrayList<>();
+        for (Stash s : STASHES.values()) {
+            if (s.toSend().isEmpty() && !s.settingsToSend) continue;
+            com.google.gson.JsonObject body = new com.google.gson.JsonObject();
+            if (s.settingsToSend) body.add("meta", meta(s));
+            com.google.gson.JsonObject cs = new com.google.gson.JsonObject();
+            List<String> keys = new ArrayList<>(s.toSend());
+            for (String k : keys) {
+                Container c = s.containers.get(k);
+                if (c != null) cs.add(k, PanelFiles.GSON.toJsonTree(c));
+            }
+            body.add("containers", cs);
+            pushes.add(new StashSync.Push(s.name, PanelFiles.GSON.toJson(body), keys, s.settingsToSend));
+            s.toSend().clear();
+            s.settingsToSend = false;
+        }
+        StashSync.start(pushes);
+    }
+
+    private static com.google.gson.JsonObject meta(Stash s) {
+        com.google.gson.JsonObject m = new com.google.gson.JsonObject();
+        m.addProperty("server", s.server);
+        m.addProperty("dimension", s.dimension);
+        m.addProperty("x", s.x);
+        m.addProperty("y", s.y);
+        m.addProperty("z", s.z);
+        m.addProperty("located", s.located);
+        m.addProperty("radius", s.radius);
+        m.addProperty("metaChanged", s.metaChanged);
+        return m;
+    }
+
+    private static void take(StashSync.Result r) {
+        for (StashSync.Push p : StashSync.finished(r)) {
+            // Not sent: sent again next round.
+            Stash s = STASHES.get(p.name().toLowerCase(Locale.ROOT));
+            if (s == null) continue;
+            s.toSend().addAll(p.keys());
+            if (p.meta()) s.settingsToSend = true;
+        }
+        if (r.error() != null) return;
+
+        for (StashSync.Change ch : r.changes()) {
+            String key = ch.name().toLowerCase(Locale.ROOT);
+            Stash s = STASHES.get(key);
+            if (s == null) {
+                s = new Stash();
+                s.name = ch.name();
+                s.file = fileFor(ch.name());
+                STASHES.put(key, s);
+            }
+            Stash from = new Stash();
+            from.containers = new LinkedHashMap<>(ch.containers());
+            if (ch.meta() != null) {
+                com.google.gson.JsonObject m = ch.meta();
+                from.server = m.has("server") ? m.get("server").getAsString() : s.server;
+                from.dimension = m.has("dimension") ? m.get("dimension").getAsString() : s.dimension;
+                from.x = m.has("x") ? m.get("x").getAsInt() : s.x;
+                from.y = m.has("y") ? m.get("y").getAsInt() : s.y;
+                from.z = m.has("z") ? m.get("z").getAsInt() : s.z;
+                from.located = m.has("located") && m.get("located").getAsBoolean();
+                from.radius = m.has("radius") ? m.get("radius").getAsInt() : s.radius;
+                from.metaChanged = m.has("metaChanged") ? m.get("metaChanged").getAsLong() : 0;
+            }
+            if (merge(s, from)) {
+                s.dirty = true;
+                s.changedAt = System.currentTimeMillis();
+            }
+            if (ch.full()) {
+                // The first look at it this session: anything newer here goes up.
+                for (Map.Entry<String, Container> e : s.containers.entrySet()) {
+                    Container theirs = ch.containers().get(e.getKey());
+                    if (theirs == null || e.getValue().updated > theirs.updated) s.toSend().add(e.getKey());
+                }
+                if (ch.meta() == null || s.metaChanged > from.metaChanged) s.settingsToSend = true;
+            }
+            StashSync.known.put(key, ch.version());
+        }
+
+        // Stashes the server does not have yet go up whole, once.
+        java.util.Set<String> remote = new java.util.HashSet<>();
+        for (String n : r.remote().keySet()) remote.add(n.toLowerCase(Locale.ROOT));
+        for (Stash s : new ArrayList<>(STASHES.values())) {
+            String key = s.name.toLowerCase(Locale.ROOT);
+            Long gone = r.deleted().get(key);
+            if (!remote.contains(key) && gone != null && Math.max(s.lastUpdated(), s.metaChanged) < gone && s.toSend().isEmpty()) {
+                // Someone deleted it after its last change here.
+                STASHES.remove(key);
+                try {
+                    if (s.file != null) Files.deleteIfExists(s.file);
+                } catch (Exception ignored) {
+                    // Gone from the list either way.
+                }
+                continue;
+            }
+            if (!remote.contains(key) && uploaded.add(key)) {
+                s.toSend().addAll(s.containers.keySet());
+                s.settingsToSend = true;
+            }
+        }
+    }
+
     // Capturing
 
     /** About to right-click a block: remembered so the screen that opens next can be matched to it. */
@@ -380,9 +511,14 @@ public final class StashStore {
         ensureLoaded();
         ticks++;
 
-        if (mc.player != null && mc.world != null) capture(mc);
+        if (mc.player != null && mc.world != null) {
+            capture(mc);
+            checkBroken(mc);
+        }
 
-        if (ticks % 40 == 0) sync();
+        ControlPanel.SyncMode mode = ControlPanel.syncMode();
+        if (mode == ControlPanel.SyncMode.Folder && ticks % 40 == 0) sync();
+        if (mode == ControlPanel.SyncMode.Server) serverTick();
         long now = System.currentTimeMillis();
         for (Stash s : STASHES.values()) {
             if (s.dirty && now - s.changedAt > 1500) save(s);
@@ -493,7 +629,145 @@ public final class StashStore {
         c.items = items;
         c.decoded = stacks;
         openStash.containers.put(openKey, c);
+        openStash.toSend().add(openKey);
         changed(openStash);
+    }
+
+    // Broken containers
+
+    /** Containers seen turning into something else, to look at again in a moment. */
+    private static final Map<BlockPos, Long> brokenAt = new HashMap<>();
+
+    /**
+     * A block changed in a loaded chunk. A container that stops being one is checked again a
+     * second later, so a break the server undoes (a ghost block, a cancelled mine) is not taken
+     * as real, and then dropped from any stash that knew what was in it.
+     */
+    public static synchronized void onBlockChanged(BlockPos pos, BlockState old, BlockState now) {
+        if (old == null || now == null || STASHES.isEmpty()) return;
+        if (!isContainer(old.getBlock()) || now.getBlock() == old.getBlock()) return;
+        brokenAt.put(pos.toImmutable(), System.currentTimeMillis());
+    }
+
+    private static boolean isContainer(Block block) {
+        return block instanceof ShulkerBoxBlock || block instanceof BarrelBlock || block instanceof ChestBlock;
+    }
+
+    private static void checkBroken(MinecraftClient mc) {
+        if (brokenAt.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        var it = brokenAt.entrySet().iterator();
+        while (it.hasNext()) {
+            var e = it.next();
+            if (now - e.getValue() < 1000) continue;
+            it.remove();
+            BlockPos pos = e.getKey();
+            if (!mc.world.isPosLoaded(pos)) continue;
+            Block block = mc.world.getBlockState(pos).getBlock();
+            // Still a container of the same sort (a chest that only lost or gained a half is
+            // handled below): nothing was broken.
+            if (isContainer(block) && !(block instanceof ChestBlock)) continue;
+            forgetAt(mc, pos, block instanceof ChestBlock);
+        }
+    }
+
+    /** Drops what any stash here knew about the container at pos, and a double chest it was half of. */
+    private static void forgetAt(MinecraftClient mc, BlockPos pos, boolean stillChest) {
+        String server = server();
+        String dimension = mc.world.getRegistryKey().getValue().toString();
+        for (Stash s : STASHES.values()) {
+            if (!s.contains(server, dimension, pos)) continue;
+            Container here = s.containers.get(key(pos));
+            // A single chest still standing where a single chest was is the same chest.
+            if (here != null && !here.removed && !(stillChest && "Chest".equals(here.kind) && single(mc, pos))) forget(s, here);
+            for (Direction d : Direction.Type.HORIZONTAL) {
+                BlockPos n = pos.offset(d);
+                Container c = s.containers.get(key(n));
+                if (c == null || c.removed || !"Double chest".equals(c.kind)) continue;
+                // The other half of a double chest filed under its neighbour: if that neighbour
+                // is no longer a double chest, what was recorded no longer describes it.
+                if (!single(mc, n) && mc.world.getBlockState(n).getBlock() instanceof ChestBlock) continue;
+                forget(s, c);
+            }
+        }
+    }
+
+    private static boolean single(MinecraftClient mc, BlockPos pos) {
+        BlockState state = mc.world.getBlockState(pos);
+        return state.getBlock() instanceof ChestBlock && (!state.contains(ChestBlock.CHEST_TYPE) || state.get(ChestBlock.CHEST_TYPE) == ChestType.SINGLE);
+    }
+
+    private static String key(BlockPos pos) {
+        return pos.getX() + "," + pos.getY() + "," + pos.getZ();
+    }
+
+    // Storage previews
+
+    /**
+     * What a stash knows is in the container at pos, for Storage GUI Tweaks' previews to fall
+     * back on when it has no record of its own, such as a container a friend opened. Null if no
+     * stash here has it, or it was recorded as another kind of container.
+     */
+    public static synchronized List<ItemStack> knownAt(BlockPos pos, String kind) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world == null || STASHES.isEmpty()) return null;
+        String server = server();
+        String dimension = mc.world.getRegistryKey().getValue().toString();
+        String k = key(pos);
+        Container best = null;
+        for (Stash s : STASHES.values()) {
+            if (!s.contains(server, dimension, pos)) continue;
+            Container c = s.containers.get(k);
+            if (c == null || c.removed || !kind.equals(c.kind)) continue;
+            if (best == null || c.updated > best.updated) best = c;
+        }
+        return best == null ? null : best.stacks();
+    }
+
+    /**
+     * Storage GUI Tweaks learnt what is in a container, by it being opened or by placing a
+     * shulker box whose contents it knew. Any stash it lies in takes that in too.
+     */
+    public static synchronized void fromPreview(BlockPos pos, String kind, List<ItemStack> stacks) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world == null || mc.player == null || pos == null || stacks == null) return;
+        ensureLoaded();
+        String server = server();
+        String dimension = mc.world.getRegistryKey().getValue().toString();
+        Stash best = null;
+        double bestDist = Double.MAX_VALUE;
+        for (Stash s : STASHES.values()) {
+            if (!s.contains(server, dimension, pos)) continue;
+            double d = pos.getSquaredDistance(s.x, s.y, s.z);
+            if (d < bestDist) {
+                bestDist = d;
+                best = s;
+            }
+        }
+        if (best == null) return;
+
+        List<String> items = new ArrayList<>(stacks.size());
+        List<ItemStack> copies = new ArrayList<>(stacks.size());
+        for (ItemStack stack : stacks) {
+            copies.add(stack.copy());
+            items.add(StorageMemory.encodeStack(stack));
+        }
+        String k = key(pos);
+        Container old = best.containers.get(k);
+        if (old != null && !old.removed && kind.equals(old.kind) && old.items.equals(items)) return;
+
+        Container c = new Container();
+        c.x = pos.getX();
+        c.y = pos.getY();
+        c.z = pos.getZ();
+        c.kind = kind;
+        c.updated = System.currentTimeMillis();
+        c.by = mc.player.getGameProfile().name();
+        c.items = items;
+        c.decoded = copies;
+        best.containers.put(k, c);
+        best.toSend().add(k);
+        changed(best);
     }
 
     private static String server() {

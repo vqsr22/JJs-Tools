@@ -145,6 +145,7 @@ public final class StorageMemory {
 
     private static ScreenHandler openHandler;
     private static String openKey;
+    private static BlockPos openPos;
     private static Kind openKind;
     private static int openSlots;
     private static String openName;
@@ -181,11 +182,33 @@ public final class StorageMemory {
         if (key == null) return null;
 
         Box box = BOXES.get(key);
+        if (box == null && kind != Kind.Ender) {
+            // Nothing of its own: the stash manager may know, from a friend or an earlier look.
+            BlockPos at = kind == Kind.Chest ? canonical(pos, state) : pos;
+            List<ItemStack> known = dev.jjstools.panel.StashStore.knownAt(at, stashKind(kind, expectedSlots(state)));
+            if (known != null) return new Box(null, known, kind);
+        }
         if (box == null || box.kind() != kind) return null;
 
         // A double chest record on what is now a single chest, or the other way round.
         if (kind == Kind.Chest && box.items().size() != expectedSlots(state)) return null;
         return box;
+    }
+
+    /** The name the stash manager files this kind of container under. */
+    private static String stashKind(Kind kind, int slots) {
+        return switch (kind) {
+            case Shulker -> "Shulker";
+            case Barrel -> "Barrel";
+            case Chest -> slots > SIZE ? "Double chest" : "Chest";
+            case Ender -> "Ender";
+        };
+    }
+
+    /** Tells the stash manager what is in a container at pos, for any stash it lies in. */
+    private static void share(BlockPos pos, Kind kind, List<ItemStack> items) {
+        if (pos == null || kind == null || kind == Kind.Ender) return;
+        dev.jjstools.panel.StashStore.fromPreview(pos, stashKind(kind, items.size()), items);
     }
 
     /** Your ender chest on this server, as last seen, if it has been opened here. */
@@ -331,6 +354,7 @@ public final class StorageMemory {
         openKey = key;
         openKind = kind;
         openSlots = slots;
+        openPos = kind == Kind.Chest ? canonical(pos, state) : pos.toImmutable();
 
         // A container left with its own name is titled with that; anything else is the default.
         String shown = mc.currentScreen == null ? null : mc.currentScreen.getTitle().getString();
@@ -348,6 +372,7 @@ public final class StorageMemory {
         Box now = new Box(openName, items, openKind);
         if (!same(now, BOXES.get(openKey))) {
             put(openKey, now);
+            share(openPos, openKind, items);
         }
     }
 
@@ -368,6 +393,7 @@ public final class StorageMemory {
 
         if (mc.world.getBlockState(pendingPos).getBlock() instanceof ShulkerBoxBlock) {
             put(pendingKey, pendingBox);
+            share(pendingPos, Kind.Shulker, pendingBox.items());
             pendingPos = null;
         }
     }

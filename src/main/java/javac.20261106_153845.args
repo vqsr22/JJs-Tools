@@ -1,0 +1,15 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/panel/ControlPanelScreen.java
+dev/jjstools/panel/Ui.java
+dev/jjstools/panel/StashStore.java
+dev/jjstools/tint/StorageMemory.java
+dev/jjstools/panel/PanelData.java
+dev/jjstools/modules/StasisPearlThrower.java
+dev/jjstools/panel/panels/PearlsPanel.java
+dev/jjstools/panel/StashWalker.java
+dev/jjstools/panel/panels/EncountersPanel.java
+dev/jjstools/panel/PanelFonts.java

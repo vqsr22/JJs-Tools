@@ -1,0 +1,8 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/panel/panels/PearlsPanel.java
+-Xmaxerrs
+5000

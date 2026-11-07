@@ -1,0 +1,7 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/panel/panels/ChatPanel.java
+dev/jjstools/panel/Prefs.java

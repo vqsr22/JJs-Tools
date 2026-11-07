@@ -19,13 +19,13 @@ import java.util.Locale;
  * both blocks and unblocks.
  */
 public class BlockedPanel extends Panel {
-    private final TextBox name = new TextBox("Name to block");
-    private final TextBox search = new TextBox("Search");
+    private final TextBox name = new TextBox("name");
+    private final TextBox search = new TextBox("search");
     private final double[] scroll = { 0 };
     private boolean askedOnOpen;
 
     public BlockedPanel() {
-        super("blocked", "Blocked", Items.BARRIER.getDefaultStack(), 150, 140);
+        super("blocked", "blocklist", Items.BARRIER.getDefaultStack(), 150, 140);
         name.max = 16;
         name.onEnter = this::block;
     }
@@ -57,21 +57,20 @@ public class BlockedPanel extends Panel {
         BlockedList.Server server = BlockedList.current();
         boolean connected = MinecraftClient.getInstance().getNetworkHandler() != null;
 
-        int bw = ui.width("Block") + 14;
+        int bw = Math.max(ui.width("block"), ui.width("refresh")) + 24;
         ui.textBox(name, x, y, w - bw - 3, bh);
-        ui.button(x + w - bw, y, bw, bh, "Block", connected && !name.text.isBlank(), this::block);
+        ui.button(x + w - bw, y, bw, bh, "block", connected && !name.text.isBlank(), this::block);
 
         int ry = y + bh + 3;
-        int rw = ui.width("Refresh") + 14;
+        int rw = bw;
         ui.textBox(search, x, ry, w - rw - 3, bh);
         String progress = BlockedList.progress();
-        boolean hover = ui.button(x + w - rw, ry, rw, bh, progress != null ? progress : "Refresh", connected && !BlockedList.refreshing(), BlockedList::refresh);
-        if (hover) ui.tooltip("Runs /ignorelist and reads every page of the reply, keeping it out of your chat.");
+        ui.button(x + w - rw, ry, rw, bh, progress != null ? progress : "refresh", connected && !BlockedList.refreshing(), BlockedList::refresh);
 
         int iy = ry + bh + 3;
-        String when = BlockedList.refreshing() ? "Reading the list from the server..."
-            : server.refreshed == 0 ? "Not fetched from the server yet" : "Fetched " + ChatPanel.ago(server.refreshed) + " ago";
-        ui.small(ui.fitSmall(when + " from " + server.address, w), x, iy, ui.fgDim());
+        String when = BlockedList.refreshing() ? "reading..."
+            : server.refreshed == 0 ? "not fetched yet" : "fetched " + ChatPanel.ago(server.refreshed) + " ago";
+        ui.small(ui.fitSmall(server.names.size() + " blocked  \u00B7  " + when, w), x, iy, ui.fgDim());
 
         String q = search.text.trim().toLowerCase(Locale.ROOT);
         List<String> list = new ArrayList<>();
@@ -84,12 +83,12 @@ public class BlockedPanel extends Panel {
         ui.clip(x + 1, ly + 1, w - 2, lh - 2);
         int off = ui.scrollArea(x + 1, ly + 1, w - 2, lh - 2, list.size() * row + 2, scroll, row);
         int cy = ly + 1 - off;
-        if (list.isEmpty()) ui.centredWrapped(server.names.isEmpty() ? "Nobody blocked" : "Nobody matches", x, w, ly + lh / 2, ui.fgWellDim());
+        if (list.isEmpty()) ui.centredWrapped(server.names.isEmpty() ? "nobody blocked" : "nobody matches", x, w, ly + lh / 2, ui.fgWellDim());
         for (String n : list) {
             if (ui.hovered(x + 1, cy, w - 8, row)) ui.fill(x + 1, cy, w - 8, row, ui.rowHover());
             boolean on = ui.online(n);
             ui.dot(x + 5, cy + (row - 6) / 2, 6, on ? Ui.GREEN : Ui.GREY_DOT);
-            int uw = ui.width("Unblock") + 12;
+            int uw = ui.width("unblock") + 16;
             String kind = server.kinds == null ? null : server.kinds.get(n.toLowerCase(Locale.ROOT));
             int face = Math.min(12, row - 4);
             ui.head(n, x + 14, cy + (row - face) / 2, face);
@@ -98,7 +97,7 @@ public class BlockedPanel extends Panel {
             int ny = cy + (row - ui.lineH()) / 2 + 1;
             ui.text(shown, nameX, ny, ui.fgWell());
             if (kind != null) ui.small(kind, nameX + ui.width(shown) + 4, ny + ui.lineH() - ui.smallH(), ui.fgWellDim());
-            ui.button(x + w - uw - 9, cy + 1, uw, row - 2, "Unblock", connected, () -> BlockedList.toggle(n));
+            ui.button(x + w - uw - 9, cy + 1, uw, row - 2, "unblock", connected, () -> BlockedList.toggle(n));
             cy += row;
         }
         ui.unclip();

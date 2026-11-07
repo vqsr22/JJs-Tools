@@ -63,6 +63,7 @@ public class EncounterStore {
         loadedFor = current;
 
         BY_NAME.clear();
+        sorted = null;
         JJFolder.migrateIfNeeded("encounters.json");
 
         if (!Files.exists(file())) return;
@@ -109,11 +110,27 @@ public class EncounterStore {
         e.dimension = dimension;
     }
 
+    /** The list sorted newest first, kept until something changes rather than sorted on every call. */
+    private static List<Encounter> sorted;
+    private static long sortedAt;
+
     public static synchronized List<Encounter> all() {
         load();
-        List<Encounter> list = new ArrayList<>(BY_NAME.values());
-        list.sort(Comparator.comparingLong((Encounter e) -> e.lastSeen).reversed());
-        return list;
+        long now = System.currentTimeMillis();
+        // Seen times change every tick for whoever is nearby, so the order is refreshed now and then.
+        if (sorted == null || sorted.size() != BY_NAME.size() || now - sortedAt > 1000) {
+            List<Encounter> list = new ArrayList<>(BY_NAME.values());
+            list.sort(Comparator.comparingLong((Encounter e) -> e.lastSeen).reversed());
+            sorted = java.util.Collections.unmodifiableList(list);
+            sortedAt = now;
+        }
+        return sorted;
+    }
+
+    /** One player by name, any case, or null. */
+    public static synchronized Encounter find(String name) {
+        load();
+        return name == null ? null : BY_NAME.get(name.toLowerCase());
     }
 
     public static synchronized void remove(Encounter encounter) {

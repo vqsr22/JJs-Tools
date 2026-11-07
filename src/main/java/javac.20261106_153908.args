@@ -1,0 +1,8 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/modules/StasisPearlThrower.java
+-Xmaxerrs
+2000

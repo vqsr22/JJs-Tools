@@ -1,6 +1,5 @@
 package dev.jjstools.panel.panels;
 
-import dev.jjstools.modules.Encounters;
 import dev.jjstools.panel.Panel;
 import dev.jjstools.panel.Prefs;
 import dev.jjstools.panel.TextBox;
@@ -31,13 +30,12 @@ public class EncountersPanel extends Panel {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yy").withZone(ZoneId.systemDefault());
     private static final DateTimeFormatter FULL = DateTimeFormatter.ofPattern("EEE d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault());
 
-    private final TextBox search = new TextBox("Search players");
+    private final TextBox search = new TextBox("search");
     private final double[] scroll = { 0 };
-    private boolean hideCoords;
     private boolean hideFriends;
 
     public EncountersPanel() {
-        super("encounters", "Encounters", Items.PLAYER_HEAD.getDefaultStack(), 260, 140);
+        super("encounters", "encounters", Items.PLAYER_HEAD.getDefaultStack(), 260, 140);
     }
 
     @Override
@@ -51,29 +49,26 @@ public class EncountersPanel extends Panel {
         int bh = Math.max(16, ui.lineH() + 7);
 
         // Options
-        int hcW = ui.width("Hide coords") + 14;
-        int hfW = ui.width("Hide friends") + 14;
-        ui.textBox(search, x, y, Math.max(80, w - hcW - hfW - 8), bh);
-        ui.toggle(x + w - hcW - hfW - 4, y, hfW, bh, "Hide friends", hideFriends, () -> hideFriends = !hideFriends);
-        ui.toggle(x + w - hcW, y, hcW, bh, "Hide coords", hideCoords || prefs.hideCoords, () -> hideCoords = !hideCoords);
+        // Search and hide friends side by side, the same size.
+        int half = (w - 4) / 2;
+        ui.textBox(search, x, y, half, bh);
+        ui.toggle(x + w - half, y, half, bh, "hide friends", hideFriends, () -> hideFriends = !hideFriends);
 
         int ty = y + bh + 4;
-        if (!Modules.get().isActive(Encounters.class)) {
-            ui.text("The Encounters module is off, so nobody new is being recorded.", x, ty, Ui.GOLD);
-            ty += ui.lineH() + 4;
-        }
 
         // Every column, as narrow as its contents allow; only if the panel is too narrow even for
         // that are the least useful ones left off, dimension first.
+        // Each column fits its heading with the sort arrow as well as its contents.
+        int arrowW = ui.width(" " + Ui.UP);
         int forgetW = ui.lineH() + 5;
-        int friendW = ui.width("Friend") + 8;
-        int numW = ui.width("Seen") + 14;
-        int dateW = ui.width("00/00/00") + 10;
-        int coordW = ui.width("-30000000, 320, -30000000") + 8;
-        int dimW = ui.width("Overworld") + 8;
+        int friendW = ui.width("friend") + arrowW + 10;
+        int numW = Math.max(ui.width("seen") + arrowW, ui.width("00000")) + 10;
+        int dateW = Math.max(ui.width("00/00/00"), ui.width("first") + arrowW) + 10;
+        int coordW = Math.max(ui.width("-30000000, 320, -30000000"), ui.width("coords") + arrowW) + 10;
+        int dimW = Math.max(ui.width("overworld"), ui.width("dim") + arrowW) + 10;
         int nameMin = ui.width("WWWWWWWWWW") + 22;
 
-        boolean noCoords = hideCoords || prefs.hideCoords;
+        boolean noCoords = prefs.hideCoords;
         List<Column> cols = new ArrayList<>(List.of(Column.Player, Column.Friend, Column.Seen, Column.First, Column.Last, Column.Coords, Column.Dimension));
         int fixed = friendW + numW + dateW * 2 + coordW + dimW + forgetW + 14;
         // Hidden coordinates take their column with them.
@@ -90,21 +85,28 @@ public class EncountersPanel extends Panel {
             fixed -= dateW;
         }
         if (nameMin + fixed > w && cols.remove(Column.Coords)) fixed -= coordW;
-        int nameW = Math.max(nameMin, w - fixed);
+        // The name column only grows so far; any more room is shared out between the columns, so
+        // they spread evenly across the panel instead of the names taking it all.
+        int nameW = Math.max(nameMin, Math.min(w - fixed, nameMin + 50));
+        int extra = Math.max(0, w - fixed - nameW) / Math.max(1, cols.size() - 1);
+        java.util.Map<Column, Integer> widths = new java.util.EnumMap<>(Column.class);
+        for (Column c : cols) {
+            widths.put(c, switch (c) {
+                case Player -> nameW;
+                case Friend -> friendW + extra;
+                case Seen -> numW + extra;
+                case First, Last -> dateW + extra;
+                case Coords -> coordW + extra;
+                case Dimension -> dimW + extra;
+            });
+        }
 
         Column sort = column(prefs.encountersSort);
         int hx = x + 2;
         int headerH = ui.lineH() + 6;
         for (Column c : cols) {
-            int cw = switch (c) {
-                case Player -> nameW;
-                case Friend -> friendW;
-                case Seen -> numW;
-                case First, Last -> dateW;
-                case Coords -> coordW;
-                case Dimension -> dimW;
-            };
-            String title = (c == Column.Dimension ? "Dim" : c.name()) + (c == sort ? (prefs.encountersSortReverse ? " " + Ui.DOWN : " " + Ui.UP) : "");
+            int cw = widths.get(c);
+            String title = (c == Column.Dimension ? "dim" : c.name().toLowerCase(Locale.ROOT)) + (c == sort ? (prefs.encountersSortReverse ? " " + Ui.DOWN : " " + Ui.UP) : "");
             boolean hover = ui.hovered(hx, ty, cw, headerH);
             ui.text(title, hx, ty + 3, c == sort ? ui.accent() : hover ? ui.fg() : ui.fgDim());
             ui.onClick(hx, ty, cw, headerH, () -> {
@@ -119,14 +121,25 @@ public class EncountersPanel extends Panel {
 
         // Rows
         String q = search.text.trim().toLowerCase(Locale.ROOT);
-        List<EncounterStore.Encounter> list = new ArrayList<>();
-        for (EncounterStore.Encounter e : EncounterStore.all()) {
-            if (e.name == null) continue;
-            if (!q.isEmpty() && !e.name.toLowerCase(Locale.ROOT).contains(q)) continue;
-            if (hideFriends && Friends.get().get(e.name) != null) continue;
-            list.add(e);
+        // Filtered and sorted a couple of times a second, not every frame: there can be thousands.
+        String key = q + "|" + sort + "|" + prefs.encountersSortReverse + "|" + hideFriends;
+        long now = System.currentTimeMillis();
+        if (!key.equals(listKey) || now - listAt > 500) {
+            listKey = key;
+            listAt = now;
+            java.util.Set<String> friendNames = new java.util.HashSet<>();
+            for (Friend f : Friends.get()) friendNames.add(f.getName().toLowerCase(Locale.ROOT));
+            List<EncounterStore.Encounter> fresh = new ArrayList<>();
+            for (EncounterStore.Encounter e : EncounterStore.all()) {
+                if (e.name == null) continue;
+                if (!q.isEmpty() && !e.name.toLowerCase(Locale.ROOT).contains(q)) continue;
+                if (hideFriends && friendNames.contains(e.name.toLowerCase(Locale.ROOT))) continue;
+                fresh.add(e);
+            }
+            fresh.sort(comparator(sort, prefs.encountersSortReverse, friendNames));
+            cached = fresh;
         }
-        list.sort(comparator(sort, prefs.encountersSortReverse));
+        List<EncounterStore.Encounter> list = cached;
 
         int ly = ty + headerH;
         int lh = h - (ly - y);
@@ -136,7 +149,7 @@ public class EncountersPanel extends Panel {
         int off = ui.scrollArea(x + 1, ly + 1, w - 2, lh - 2, list.size() * row + 2, scroll, row);
         int ry = ly + 1 - off;
 
-        if (list.isEmpty()) ui.centredWrapped(q.isEmpty() ? "Nobody yet. Turn on the Encounters module." : "Nobody matches.", x, w, ly + lh / 2, ui.fgWellDim());
+        if (list.isEmpty()) ui.centredWrapped(q.isEmpty() ? "nobody yet" : "nobody matches", x, w, ly + lh / 2, ui.fgWellDim());
 
         for (EncounterStore.Encounter e : list) {
             if (ry + row < ly || ry > ly + lh) {
@@ -155,7 +168,7 @@ public class EncountersPanel extends Panel {
                         int face = Math.min(12, row - 4);
                         ui.head(e.name, cx + 11, ry + (row - face) / 2, face);
                         ui.text(ui.fit(e.name, nameW - face - 16), cx + 13 + face, textY, on ? ui.fgWell() : ui.fgWellDim());
-                        cx += nameW;
+                        cx += widths.get(c);
                     }
                     case Friend -> {
                         int fb = row - 4;
@@ -164,33 +177,32 @@ public class EncountersPanel extends Panel {
                             else Friends.get().remove(friend);
                         });
                         if (friend != null) ui.text("*", cx + fb + 3, textY, Ui.GOLD);
-                        cx += friendW;
+                        cx += widths.get(c);
                     }
                     case Seen -> {
                         ui.text(String.valueOf(e.count), cx, textY, ui.fgWell());
-                        cx += numW;
+                        cx += widths.get(c);
                     }
                     case First -> {
                         ui.text(DATE.format(Instant.ofEpochMilli(e.firstSeen)), cx, textY, ui.fgWellDim());
-                        cx += dateW;
+                        cx += widths.get(c);
                     }
                     case Last -> {
                         ui.text(DATE.format(Instant.ofEpochMilli(e.lastSeen)), cx, textY, ui.fgWell());
-                        cx += dateW;
+                        cx += widths.get(c);
                     }
                     case Coords -> {
                         ui.text(e.x + ", " + e.y + ", " + e.z, cx, textY, ui.fgWell());
-                        cx += coordW;
+                        cx += widths.get(c);
                     }
                     case Dimension -> {
                         ui.text(dimension(e.dimension), cx, textY, ui.fgWellDim());
-                        cx += dimW;
+                        cx += widths.get(c);
                     }
                 }
             }
             boolean forget = ui.button(x + w - forgetW - 8, ry + 2, forgetW, row - 4, "x", () -> EncounterStore.remove(e));
-            if (forget) ui.tooltip("Forget " + e.name);
-            else if (ui.hovered(x + 1, ry, w - 8, row)) {
+            if (!forget && ui.hovered(x + 1, ry, w - 8, row)) {
                 ui.tooltip(e.name + "  -  first seen " + FULL.format(Instant.ofEpochMilli(e.firstSeen)) + ", last seen " + FULL.format(Instant.ofEpochMilli(e.lastSeen)));
             }
             ry += row;
@@ -203,10 +215,14 @@ public class EncountersPanel extends Panel {
         return Column.Last;
     }
 
-    private static Comparator<EncounterStore.Encounter> comparator(Column sort, boolean reverse) {
+    private String listKey;
+    private long listAt;
+    private List<EncounterStore.Encounter> cached = List.of();
+
+    private static Comparator<EncounterStore.Encounter> comparator(Column sort, boolean reverse, java.util.Set<String> friendNames) {
         Comparator<EncounterStore.Encounter> c = switch (sort) {
             case Player -> Comparator.comparing(e -> e.name.toLowerCase(Locale.ROOT));
-            case Friend -> Comparator.comparing(e -> Friends.get().get(e.name) == null);
+            case Friend -> Comparator.comparing(e -> !friendNames.contains(e.name.toLowerCase(Locale.ROOT)));
             case Seen -> Comparator.comparingInt(e -> e.count);
             case First -> Comparator.comparingLong(e -> e.firstSeen);
             case Last -> Comparator.comparingLong(e -> e.lastSeen);
@@ -219,9 +235,9 @@ public class EncountersPanel extends Panel {
 
     private static String dimension(String id) {
         if (id == null) return "?";
-        if (id.contains("nether")) return "Nether";
-        if (id.contains("end")) return "End";
-        if (id.contains("overworld")) return "Overworld";
+        if (id.contains("nether")) return "nether";
+        if (id.contains("end")) return "end";
+        if (id.contains("overworld")) return "overworld";
         return id;
     }
 }

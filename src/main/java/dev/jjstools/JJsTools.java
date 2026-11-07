@@ -54,9 +54,30 @@ public class JJsTools extends MeteorAddon {
         Modules.get().add(new XCarry());
         Modules.get().add(new ChatTweaks());
         Modules.get().add(new ControlPanel());
+        // JJ's theme: Meteor's GUI with rounded corners in the Control Panel's colours.
+        dev.jjstools.gui.jjtheme.JJGuiTheme.register();
+        // Themes and Fonts tabs in Meteor's GUI, like the Control Panel's pages.
+        dev.jjstools.gui.ThemesTab themesTab = new dev.jjstools.gui.ThemesTab();
+        dev.jjstools.gui.FontsTab fontsTab = new dev.jjstools.gui.FontsTab();
+        meteordevelopment.meteorclient.gui.tabs.Tabs.add(themesTab);
+        meteordevelopment.meteorclient.gui.tabs.Tabs.add(fontsTab);
+        // Between GUI and HUD, next to the GUI tab's own theme settings.
+        var tabs = meteordevelopment.meteorclient.gui.tabs.Tabs.get();
+        tabs.remove(themesTab);
+        tabs.remove(fontsTab);
+        int at = tabs.size();
+        for (int i = 0; i < tabs.size(); i++) {
+            if (tabs.get(i) instanceof meteordevelopment.meteorclient.gui.tabs.builtin.GuiTab) {
+                at = i + 1;
+                break;
+            }
+        }
+        tabs.add(at, themesTab);
+        tabs.add(at + 1, fontsTab);
         Modules.get().add(new PortalPrintDetector());
         Modules.get().add(new PortalScraps());
-        Modules.get().add(new Encounters());
+        // Encounters is part of the Control Panel now and always on; its settings are in the Control Panel module.
+        dev.jjstools.panel.EncounterTracker.init();
         Modules.get().add(new ViaTextureFix());
         Modules.get().add(new Incognito());
         Modules.get().add(new TeamTrees());

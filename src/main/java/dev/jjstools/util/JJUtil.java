@@ -55,6 +55,21 @@ public class JJUtil {
         return color;
     }
 
+    /**
+     * Whether you are on 2b2t: by the address you joined, or, when that is a proxy such as
+     * ZenithProxy, by the tab list's header and footer, which 2b2t fills in itself.
+     */
+    public static boolean on2b2t() {
+        if (mc.getNetworkHandler() == null) return false;
+        var server = mc.getCurrentServerEntry();
+        if (server != null && server.address != null && server.address.toLowerCase(java.util.Locale.ROOT).contains("2b2t")) return true;
+        if (mc.inGameHud == null) return false;
+        var tab = (dev.jjstools.mixin.PlayerListHudAccessor) mc.inGameHud.getPlayerListHud();
+        String words = (tab.jjstools$getHeader() == null ? "" : tab.jjstools$getHeader().getString())
+            + " " + (tab.jjstools$getFooter() == null ? "" : tab.jjstools$getFooter().getString());
+        return words.toLowerCase(java.util.Locale.ROOT).contains("2b2t");
+    }
+
     public static boolean isIn2b2tQueue() {
         if (mc.player == null || mc.getNetworkHandler() == null) return false;
 

@@ -19,6 +19,8 @@ public abstract class Panel {
     public int x, y, w, h;
     public boolean open = true;
     public int z;
+    /** Where the window was before it was made to fill the screen, or null if it does not. */
+    public int[] restore;
 
     protected Panel(String id, String title, ItemStack icon, int minW, int minH) {
         this.id = id;

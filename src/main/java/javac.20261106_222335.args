@@ -1,0 +1,7 @@
+-proc:none
+-d
+/tmp/jc
+-sourcepath
+.
+dev/jjstools/panel/ControlPanelScreen.java
+dev/jjstools/panel/Ui.java

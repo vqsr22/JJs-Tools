@@ -583,7 +583,7 @@ public class ChatNotifications extends Module {
                             String msg = cached != null
                                 ? "Sound file not found, using the copy saved earlier."
                                 : "Sound file not found, or not .mp3/.ogg/.wav: " + path;
-                            mc.execute(() -> info(msg));
+                            mc.execute(() -> info("%s", msg));
                         }
                     }
                 }
@@ -600,7 +600,7 @@ public class ChatNotifications extends Module {
             } catch (Throwable t) {
                 pcm = null;
                 format = null;
-                if (report) mc.execute(() -> warning("Could not load the sound file (" + t.getMessage() + "). Using the default sound."));
+                if (report) mc.execute(() -> warning("%s", "Could not load the sound file (" + t.getMessage() + "). Using the default sound."));
             }
 
             if (playAfter) play();
