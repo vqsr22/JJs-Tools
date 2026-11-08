@@ -128,6 +128,7 @@ public final class StorageMemory {
      * on a thread of its own.
      */
     private static final Map<String, JsonObject> ENCODED = new HashMap<>();
+    private static RegistryOps<NbtElement> lastNbtOps;
 
     private static final java.util.concurrent.ExecutorService WRITER = java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "JJs Tools storage previews");
@@ -672,7 +673,10 @@ public final class StorageMemory {
         NbtElement element = result.result().orElse(null);
         if (element == null) {
             report("save", stack, result.error().map(Object::toString).orElse("unknown"));
-            return new JsonPrimitive("");
+            // A shulker box is one item with everything inside it, so one item inside that the
+            // game cannot write would lose the whole box. Saved again without just that item.
+            element = withoutUnsavable(stack, nbtOps);
+            if (element == null) return new JsonPrimitive("");
         }
 
         try {
@@ -686,6 +690,21 @@ public final class StorageMemory {
             report("save", stack, e.toString());
             return new JsonPrimitive("");
         }
+    }
+
+    /** A container item written out with the items inside it that cannot be written left out, or null. */
+    private static @Nullable NbtElement withoutUnsavable(ItemStack stack, RegistryOps<NbtElement> nbtOps) {
+        ContainerComponent container = stack.get(DataComponentTypes.CONTAINER);
+        if (container == null) return null;
+        DefaultedList<ItemStack> inside = DefaultedList.ofSize(SIZE, ItemStack.EMPTY);
+        container.copyTo(inside);
+        for (int i = 0; i < inside.size(); i++) {
+            ItemStack in = inside.get(i);
+            if (!in.isEmpty() && ItemStack.CODEC.encodeStart(nbtOps, in).result().isEmpty()) inside.set(i, ItemStack.EMPTY);
+        }
+        ItemStack copy = stack.copy();
+        copy.set(DataComponentTypes.CONTAINER, ContainerComponent.fromStacks(inside));
+        return ItemStack.CODEC.encodeStart(nbtOps, copy).result().orElse(null);
     }
 
     private static ItemStack readStack(JsonElement json, RegistryOps<JsonElement> ops, RegistryOps<NbtElement> nbtOps) {
@@ -718,7 +737,7 @@ public final class StorageMemory {
     private static void report(String what, @Nullable ItemStack stack, String why) {
         String item = stack == null ? "an item" : stack.getItem().toString();
         if (REPORTED.add(what + item + why)) {
-            System.err.println("[JJs Tools] Storage previews could not " + what + " " + item + ": " + why);
+            dev.jjstools.JJsTools.LOG.warn("Storage previews could not " + what + " " + item + ": " + why);
         }
     }
 
@@ -734,9 +753,14 @@ public final class StorageMemory {
      */
     private static void save(boolean now) {
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (!loaded || mc == null || mc.world == null) return;
+        if (!loaded || mc == null) return;
 
-        RegistryOps<NbtElement> nbtOps = mc.world.getRegistryManager().getOps(NbtOps.INSTANCE);
+        // The world's item registries, or the last ones seen: leaving a world can clear the
+        // world before this is called, and saving nothing then lost whatever had changed since
+        // the last save.
+        if (mc.world != null) lastNbtOps = mc.world.getRegistryManager().getOps(NbtOps.INSTANCE);
+        RegistryOps<NbtElement> nbtOps = lastNbtOps;
+        if (nbtOps == null) return;
         JsonObject root = new JsonObject();
 
         for (Map.Entry<String, Box> entry : BOXES.entrySet()) {
@@ -776,10 +800,24 @@ public final class StorageMemory {
             // Written beside the real file and moved over it, so a crash mid-write cannot leave
             // half a file where every remembered container used to be.
             Path temp = path.resolveSibling(FILE + ".tmp");
-            Files.writeString(temp, GSON.toJson(root), StandardCharsets.UTF_8);
-            Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+            String text = GSON.toJson(root);
+            Files.writeString(temp, text, StandardCharsets.UTF_8);
+            try {
+                Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (Exception moveFailed) {
+                // Windows refuses to replace a file something else has open for a moment (an
+                // antivirus scan, a backup tool). Tried again shortly, then written straight over
+                // rather than failing every time and keeping nothing new.
+                try {
+                    Thread.sleep(200);
+                    Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception again) {
+                    Files.writeString(path, text, StandardCharsets.UTF_8);
+                    Files.deleteIfExists(temp);
+                }
+            }
         } catch (Exception e) {
-            System.err.println("[JJs Tools] Could not write " + FILE + ": " + e);
+            dev.jjstools.JJsTools.LOG.warn("Could not write " + FILE, e);
         }
     }
 

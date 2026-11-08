@@ -63,7 +63,7 @@ public abstract class GuiTabScreenMixin extends WindowTabScreen {
         if (Modules.get().getAll().stream().anyMatch(m -> m.favorite)) ids.add("favorites");
         if (ids.size() < 2) return;
 
-        WSection section = add(theme.section("column stacking")).expandX().widget();
+        WSection section = add(theme.section("column stacking (for autofit button)")).expandX().widget();
         WTable table = section.add(theme.table()).expandX().widget();
         for (String id : ids) {
             List<String> options = new ArrayList<>();

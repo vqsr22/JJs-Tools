@@ -742,8 +742,8 @@ public class ControlPanelScreen extends Screen {
             int cw = cellW;
             ui.withTheme(t, () -> {
                 if (on) {
-                    ui.round(cx, cy, cw, cellH, 4, ringColour);
-                    ui.round(cx + 2, cy + 2, cw - 4, cellH - 4, 3, ui.panelColour());
+                    // An even ring, a little thicker than a line, on every side.
+                    ui.ring(cx, cy, cw, cellH, 4, 3, ringColour, ui.panelColour());
                 } else {
                     ui.round(cx, cy, cw, cellH, 4, ui.panelColour());
                 }

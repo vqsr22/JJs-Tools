@@ -1,7 +1,0 @@
--proc:none
--d
-/tmp/jc
--sourcepath
-.
-dev/jjstools/panel/PanelGuiTheme.java
-dev/jjstools/panel/Ui.java

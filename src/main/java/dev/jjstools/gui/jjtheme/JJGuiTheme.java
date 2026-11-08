@@ -388,63 +388,14 @@ public class JJGuiTheme extends GuiTheme {
         }
         if (columns.isEmpty()) return;
 
-        // A stack takes one place in the row, as wide as its widest column: the columns lower in
-        // a stack join the column at its top.
-        List<List<List<String>>> places = new java.util.ArrayList<>();
-        java.util.Map<String, List<List<String>>> placeOf = new java.util.HashMap<>();
-        for (int i = 0; i < columns.size(); i++) {
-            String root = ids.get(i);
-            for (int n = 0; n < 256; n++) {
-                String under = ColumnStacks.below(root);
-                if (under == null || !ids.contains(under) || ColumnStacks.wouldLoop(root, under)) break;
-                root = under;
-            }
-            List<List<String>> place = placeOf.get(root);
-            if (place == null) {
-                place = new java.util.ArrayList<>();
-                placeOf.put(root, place);
-                places.add(place);
-            }
-            place.add(columns.get(i));
-        }
-
-        // A first guess from the module names, measured as the columns measure them; the
-        // columns themselves are then measured on screen and the scale put right (fitTick).
-        double screen = meteordevelopment.meteorclient.utils.Utils.getWindowWidth();
-        double gap = scale(4);
-        enterModuleList();
-        try {
-            for (int i = 0; i < 8; i++) {
-                double now = moduleListScale.get();
-                double row = 0;
-                for (List<List<String>> place : places) {
-                    double widest = 0;
-                    for (List<String> names : place) widest = Math.max(widest, columnWidth(names));
-                    row += widest;
-                }
-                double next = Math.max(0.3, Math.min(4, now * (screen - gap * (places.size() + 1)) / row));
-                next = Math.floor(next * 10000) / 10000;
-                if (Math.abs(next - now) < 0.0001) break;
-                moduleListScale.set(next);
-            }
-        } finally {
-            exitModuleList();
-        }
-        fitTicks = 40;
+        // Fitted the next time the module columns are on screen (fitTick).
+        fitPending = true;
         // Back into one row from the left, as Meteor lays out columns nobody has moved.
         for (String id : ids) {
             meteordevelopment.meteorclient.gui.utils.WindowConfig config = getWindowConfig(id);
             config.x = -1;
             config.y = -1;
         }
-    }
-
-    /** How wide a module column comes out: its widest row, worked out as the module rows lay themselves out. */
-    private double columnWidth(List<String> names) {
-        double margin = Math.round(unit() * 3);
-        double widest = equalColumns.get() ? widestModuleName() : 0;
-        for (String n : names) widest = Math.max(widest, textWidth(shown(n)));
-        return margin * 2 + pad() * 2 + widest;
     }
 
     public static void register() {
@@ -459,47 +410,74 @@ public class JJGuiTheme extends GuiTheme {
 
     /** Called every tick: brings the colours in line with the panel's theme while this theme is in use. */
     private int ticks;
-    /** Ticks left to measure the module columns on screen and correct the module list scale until they fit. */
-    private int fitTicks;
+    /** Whether auto fit was pressed and the module columns have not been fitted since. */
+    private boolean fitPending;
+    /** A module list scale being tried by auto fit, or -1. */
+    private double trialScale = -1;
 
     /**
-     * Measures the module columns as they are on screen and corrects the module list scale until
-     * the row reaches from one margin to the other: the left one Meteor leaves, the same again on
-     * the right. Columns that spill onto a second row mean it is too big.
+     * Auto fit, once the module columns are open: the biggest module list scale whose row of
+     * columns fits between a margin on the left and the same on the right without wrapping.
+     *
+     * Each scale tried is laid out for real, straight away and off screen, and the result
+     * measured, so the answer is exact and settled before anything is drawn. Text does not grow
+     * evenly with the scale (each size is drawn from its own font), so guessing from one
+     * measurement and correcting over the next ticks overshot back and forth, and windows from
+     * the screen before were sometimes measured too. A halving search finds it in under twenty
+     * tries instead, every one from this screen alone.
      */
     private void fitTick() {
-        if (fitTicks <= 0) return;
+        if (!fitPending) return;
         if (!(mc.currentScreen instanceof meteordevelopment.meteorclient.gui.screens.ModulesScreen screen)) return;
-        List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> windows = dev.jjstools.gui.jjtheme.widgets.WJJWindow.moduleColumns();
-        if (windows.isEmpty()) return;
-        fitTicks--;
+        fitPending = false;
+        var root = ((dev.jjstools.mixin.WidgetScreenAccessor) screen).jjstools$getRoot();
 
-        double left = Double.MAX_VALUE, right = 0, top = Double.MAX_VALUE, bottomTop = 0;
-        for (var w : windows) {
-            left = Math.min(left, w.x);
+        double lo = 0.3, hi = 4;
+        try {
+            if (fits(root, hi)) lo = hi;
+            else if (fits(root, lo)) {
+                for (int i = 0; i < 18; i++) {
+                    double mid = (lo + hi) / 2;
+                    if (fits(root, mid)) lo = mid;
+                    else hi = mid;
+                }
+            }
+        } finally {
+            trialScale = -1;
+        }
+        moduleListScale.set(Math.floor(lo * 10000) / 10000);
+        screen.invalidate();
+    }
+
+    /** Lays the screen out with the module columns at a trial scale and says whether the row fits. */
+    private boolean fits(meteordevelopment.meteorclient.gui.widgets.containers.WContainer root, double trial) {
+        trialScale = trial;
+        root.calculateSize();
+        root.calculateWidgetPositions();
+
+        List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> columns = new java.util.ArrayList<>();
+        collectColumns(root, columns);
+        if (columns.isEmpty()) return true;
+        double right = 0, top = Double.MAX_VALUE, lowestTop = -Double.MAX_VALUE;
+        for (var w : columns) {
             right = Math.max(right, w.x + w.width);
             // Columns lower in a stack are meant to be lower; only the tops of stacks tell of a wrap.
             if (ColumnStacks.above(w) != null) continue;
             top = Math.min(top, w.y);
-            bottomTop = Math.max(bottomTop, w.y);
+            lowestTop = Math.max(lowestTop, w.y);
         }
         double margin = scale(4);
-        double target = meteordevelopment.meteorclient.utils.Utils.getWindowWidth() - margin - left;
-        double span = right - left;
-        double now = moduleListScale.get();
-        double next;
-        if (bottomTop - top > 1) next = now * 0.95;
-        else if (Math.abs(target - span) <= 1) {
-            fitTicks = 0;
-            return;
-        } else next = now * target / span;
-        next = Math.max(0.3, Math.min(4, Math.floor(next * 10000) / 10000));
-        if (next == now) {
-            fitTicks = 0;
+        return lowestTop - top <= 1 && right <= meteordevelopment.meteorclient.utils.Utils.getWindowWidth() - margin + 0.5;
+    }
+
+    private static void collectColumns(meteordevelopment.meteorclient.gui.widgets.WWidget widget, List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> out) {
+        if (widget instanceof dev.jjstools.gui.jjtheme.widgets.WJJWindow w && w.isModuleColumn()) {
+            out.add(w);
             return;
         }
-        moduleListScale.set(next);
-        screen.invalidate();
+        if (widget instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer c) {
+            for (var cell : c.cells) collectColumns(cell.widget(), out);
+        }
     }
 
     public static void tick() {
@@ -810,7 +788,8 @@ public class JJGuiTheme extends GuiTheme {
     }
 
     private double currentScale() {
-        return moduleScope > 0 ? moduleListScale.get() : scale.get();
+        if (moduleScope <= 0) return scale.get();
+        return trialScale > 0 ? trialScale : moduleListScale.get();
     }
 
     @Override

@@ -1,8 +1,0 @@
--d
-/tmp/jc
--proc:none
--sourcepath
-.
--Xmaxerrs
-5000
-dev/jjstools/panel/Ui.java

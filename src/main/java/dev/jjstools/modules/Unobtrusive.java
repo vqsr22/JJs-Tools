@@ -150,6 +150,38 @@ public class Unobtrusive extends Module {
         .build()
     );
 
+    private final Setting<Double> eatBobSpeed = sgHands.add(new DoubleSetting.Builder()
+        .name("eat-bob-speed")
+        .description("How fast food and drink bob up and down while you eat. 1 is vanilla, 0.5 half as fast, 0 holds it still.")
+        .defaultValue(1.0)
+        .min(0.0).max(1.0)
+        .sliderRange(0.0, 1.0)
+        .build()
+    );
+
+    private final Setting<Double> eatBobHeight = sgHands.add(new DoubleSetting.Builder()
+        .name("eat-bob-height")
+        .description("How far food and drink bob up and down while you eat. 1 is vanilla, 0.5 half as far, 0 not at all.")
+        .defaultValue(1.0)
+        .min(0.0).max(1.0)
+        .sliderRange(0.0, 1.0)
+        .build()
+    );
+
+    /**
+     * Vanilla's eating bob is the size of a cosine of the time spent eating. Slowing the time it
+     * is given by eat-bob-speed slows the bob, and scaling what comes back by eat-bob-height
+     * makes it smaller, so the two are set apart.
+     */
+    public static float eatBob(double angle, java.util.function.DoubleUnaryOperator cos) {
+        Unobtrusive m = active();
+        if (m == null) return (float) cos.applyAsDouble(angle);
+        double speed = m.eatBobSpeed.get();
+        // At speed 0 it rests at the top of the bob, where vanilla starts, rather than wherever it froze.
+        double value = speed <= 0 ? 1.0 : cos.applyAsDouble(angle * speed);
+        return (float) (value * m.eatBobHeight.get());
+    }
+
     // Particles
 
     private final Setting<Boolean> hideFireworks = sgParticles.add(new BoolSetting.Builder()

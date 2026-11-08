@@ -108,6 +108,16 @@ public class WJJSearchBar extends WVerticalList implements JJWidget {
 
     /** Where the module columns should start: below this bar, leaving the same gap again. */
     public static double contentTop(WWidget anyChildOfScreen) {
+        return contentTop(anyChildOfScreen, true);
+    }
+
+    /** How much further down the columns are pushed right now by search matches showing. */
+    public static double resultsExtra(WWidget anyChildOfScreen) {
+        double with = contentTop(anyChildOfScreen, true), without = contentTop(anyChildOfScreen, false);
+        return with < 0 || without < 0 ? 0 : with - without;
+    }
+
+    private static double contentTop(WWidget anyChildOfScreen, boolean withResults) {
         WWidget w = anyChildOfScreen;
         while (w != null && w.parent != null) w = w.parent;
         if (!(w instanceof WContainer root)) return -1;
@@ -125,7 +135,7 @@ public class WJJSearchBar extends WVerticalList implements JJWidget {
         double top = bar.y + bar.height + gap + rowH + gap;
         // While there are matches the columns make room for them, so nothing lies over anything
         // and every match can be clicked.
-        if (search.results != null && !search.results.cells.isEmpty()) top += search.results.height + gap;
+        if (withResults && search.results != null && !search.results.cells.isEmpty()) top += search.results.height + gap;
         return top;
     }
 

@@ -15,13 +15,13 @@ import java.util.Map;
  * at the exact number of screen pixels it shows at with softened edges, and kept for reuse. Each
  * picture is white, and tinted to whatever colour it is drawn in.
  */
-final class UiShapes {
+public final class UiShapes {
     /** Whether a point, in a shape of this size, is inside it. Points are in pixels, 0 to size. */
     private interface Inside {
         boolean at(double x, double y, int w, int h);
     }
 
-    record Shape(Identifier id, int w, int h) {}
+    public record Shape(Identifier id, int w, int h) {}
 
     private static final int MAX = 96;
     private static final Map<String, Shape> SHAPES = new LinkedHashMap<>(64, 0.75F, true);
@@ -29,7 +29,7 @@ final class UiShapes {
     private UiShapes() {}
 
     /** A filled circle r pixels across its radius, its quarters used for round corners. */
-    static Shape circle(int r) {
+    public static Shape circle(int r) {
         return make("circle" + r, r * 2, r * 2, (x, y, w, h) -> {
             double dx = x - w / 2.0, dy = y - h / 2.0;
             return dx * dx + dy * dy <= (w / 2.0) * (w / 2.0);

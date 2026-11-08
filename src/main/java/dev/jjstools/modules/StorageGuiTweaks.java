@@ -713,9 +713,33 @@ public class StorageGuiTweaks extends Module {
 
     @EventHandler
     private void onRender2D(Render2DEvent event) {
-        if (!preview.get() || mc.world == null) {
+        // Under Exordium this event only comes on the frames it lets the HUD draw, and what is
+        // drawn here did not reach its saved copy at all, so the preview only showed with a
+        // screen open. There it is drawn every frame from ScreenOverlay instead.
+        if (TabOptimizer.EXORDIUM) return;
+        renderPreview(event.drawContext, event.screenWidth);
+    }
+
+    /** The crosshair preview, animated, for the HUD or for ScreenOverlay. True if anything was drawn. */
+    public boolean renderPreview(net.minecraft.client.gui.DrawContext context, int screenWidth) {
+        if (!updatePreview()) return false;
+        drawPreview(context, screenWidth);
+        return true;
+    }
+
+    /** Draws the preview as it stands after updatePreview. */
+    public void drawPreview(net.minecraft.client.gui.DrawContext context, int screenWidth) {
+        draw(context, screenWidth, eased(progress));
+    }
+
+    /** Moves the preview's animation on a frame. True if there is anything to draw. */
+    public boolean updatePreview() {
+        // Gone at once, not faded, when a screen opens: the HUD is still drawn under the screen,
+        // so opening the chest showed the preview fading out behind it.
+        if (!preview.get() || mc.world == null || mc.currentScreen != null) {
             progress = 0.0F;
-            return;
+            lastFrame = 0L;
+            return false;
         }
 
         BlockPos target = lookedAt();
@@ -743,8 +767,7 @@ public class StorageGuiTweaks extends Module {
             progress = Math.max(0.0F, Math.min(1.0F, progress + (showing ? step : -step)));
         }
 
-        if (progress <= 0.0F || shownBox == null) return;
-        draw(event.drawContext, event.screenWidth, eased(progress));
+        return progress > 0.0F && shownBox != null;
     }
 
     /**

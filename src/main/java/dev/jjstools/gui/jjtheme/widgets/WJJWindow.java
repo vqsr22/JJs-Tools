@@ -121,7 +121,11 @@ public class WJJWindow extends WWindow implements JJWidget {
         if (top <= 0) return;
         var config = theme.getWindowConfig(id);
         boolean placedByMeteor = config.y == -1 && !moved;
-        double want = placedByMeteor && parent != null ? top + (y - parent.y) : Math.max(y, top);
+        // A window with a place of its own keeps it, moved down only as far as search matches
+        // push everything down, and back up once they go. Pushing it to just below the matches
+        // and leaving it there is what left columns stranded low after a search.
+        double want = placedByMeteor && parent != null ? top + (y - parent.y)
+            : Math.max(y + WJJSearchBar.resultsExtra(this), top);
         if (want != y) move(0, want - y);
     }
 
@@ -168,7 +172,9 @@ public class WJJWindow extends WWindow implements JJWidget {
             if (cell.widget() instanceof WWindow w && w.id != null) {
                 var config = theme.getWindowConfig(w.id);
                 config.x = w.x;
-                config.y = w.y;
+                // Where it would be with no search matches showing, so a resize in the middle of
+                // a search does not keep it pushed down afterwards.
+                config.y = w.y - WJJSearchBar.resultsExtra(w);
             }
         }
     }
@@ -250,7 +256,7 @@ public class WJJWindow extends WWindow implements JJWidget {
     private long lastShown;
 
     /** A category or favourites column on the modules screen, rather than any other window. */
-    private boolean isModuleColumn() {
+    public boolean isModuleColumn() {
         return id != null && !"search".equals(id)
             && net.minecraft.client.MinecraftClient.getInstance().currentScreen instanceof meteordevelopment.meteorclient.gui.screens.ModulesScreen;
     }

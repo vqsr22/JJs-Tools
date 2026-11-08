@@ -2,11 +2,11 @@ package dev.jjstools.modules;
 
 import dev.jjstools.JJsTools;
 import meteordevelopment.meteorclient.events.render.Render2DEvent;
-import net.minecraft.client.gui.DrawContext;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
+import meteordevelopment.meteorclient.renderer.Renderer2D;
 
 /**
  * Covers up anything on screen you do not want in a screenshot or on stream: your coordinates,
@@ -76,43 +76,54 @@ public class Incognito extends Module {
         super(JJsTools.CATEGORY, "incognito", "Covers your coordinates and minimap for screenshots and streaming.");
     }
 
-    @EventHandler
+    /**
+     * Drawn last, after Meteor's HUD, and straight to the screen with Meteor's own renderer, the
+     * same way Meteor's HUD (the coordinates being covered) is drawn.
+     *
+     * The patches used to go through Minecraft's GUI drawing, which Exordium takes over: it draws
+     * the GUI into a buffer of its own every few frames, and these patches never made it into
+     * that buffer, so they only showed with a screen open, when Exordium steps aside. Drawing them
+     * the way Meteor's HUD is drawn keeps them over the coordinates whatever Exordium does.
+     */
+    @EventHandler(priority = meteordevelopment.orbit.EventPriority.LOWEST)
     private void onRender2D(Render2DEvent event) {
-        if (coordsOn.get()) {
-            draw(event.drawContext, coordsShape.get(), coordsX.get(), coordsY.get(),
-                coordsW.get(), coordsH.get(), coordsColour.get());
-        }
-        if (mapOn.get()) {
-            draw(event.drawContext, mapShape.get(), mapX.get(), mapY.get(),
-                mapW.get(), mapH.get(), mapColour.get());
-        }
+        // Under Exordium this event only comes on the frames it lets the HUD draw, so the covers
+        // flickered; there they are drawn every frame from ScreenOverlay instead.
+        if (dev.jjstools.modules.TabOptimizer.EXORDIUM) return;
+        drawCovers();
     }
 
-    /**
-     * Render2DEvent hands over a vanilla DrawContext rather than Meteor's Renderer2D, so the
-     * patches are drawn with fill().
-     *
-     * The circle is a stack of one pixel strips, since fill only does rectangles. At minimap sizes
-     * the stepping is not visible.
-     */
-    private void draw(DrawContext context, Shape shape, int x, int y, int w, int h, SettingColor colour) {
-        int argb = colour.getPacked();
+    public boolean anyCovers() {
+        return coordsOn.get() || mapOn.get();
+    }
 
+    /** Draws the covers in screen pixels, with the projection already set for that. */
+    public void drawCovers() {
+        if (!coordsOn.get() && !mapOn.get()) return;
+        // Positions are in GUI pixels; this renderer works in screen pixels.
+        double k = mc.getWindow().getScaleFactor();
+        Renderer2D r = Renderer2D.COLOR;
+        r.begin();
+        if (coordsOn.get()) draw(r, k, coordsShape.get(), coordsX.get(), coordsY.get(), coordsW.get(), coordsH.get(), coordsColour.get());
+        if (mapOn.get()) draw(r, k, mapShape.get(), mapX.get(), mapY.get(), mapW.get(), mapH.get(), mapColour.get());
+        r.end();
+        r.render();
+    }
+
+    /** A rectangle, or an ellipse as a stack of one pixel strips. */
+    private static void draw(Renderer2D r, double k, Shape shape, int gx, int gy, int gw, int gh, SettingColor colour) {
+        double x = gx * k, y = gy * k, w = gw * k, h = gh * k;
         if (shape == Shape.Rectangle) {
-            context.fill(x, y, x + w, y + h, argb);
+            r.quad(x, y, w, h, colour);
             return;
         }
-
-        double rx = w / 2.0;
-        double ry = h / 2.0;
-
-        for (int row = 0; row < h; row++) {
+        double rx = w / 2.0, ry = h / 2.0;
+        int rows = (int) Math.ceil(h);
+        for (int row = 0; row < rows; row++) {
             double dy = (row + 0.5 - ry) / ry;
             double half = Math.sqrt(Math.max(0, 1 - dy * dy)) * rx;
             if (half <= 0) continue;
-            int left = (int) Math.round(x + rx - half);
-            int right = (int) Math.round(x + rx + half);
-            context.fill(left, y + row, right, y + row + 1, argb);
+            r.quad(x + rx - half, y + row, half * 2, 1, colour);
         }
     }
 }

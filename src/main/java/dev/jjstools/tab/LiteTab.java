@@ -62,6 +62,15 @@ public final class LiteTab {
     private static int keyFlags = -1;
     private static Object keyFont;
     private static long builtAt;
+    private static boolean keyJj;
+    private static int[] keyPalette;
+
+    // JJ's theme: the Control Panel's colours, fetched now and then rather than every frame.
+    private static final int PAD = 4;
+    private static final int RADIUS = 4;
+    private static boolean jj;
+    private static int[] palette = new int[6];
+    private static long paletteAt;
 
     // Snapshot
     private static PlayerListEntry[] entries = new PlayerListEntry[0];
@@ -129,6 +138,7 @@ public final class LiteTab {
         keyScale = -1f;
         keyFlags = -1;
         keyFont = null;
+        keyPalette = null;
         queued = false;
         queuedLines.clear();
         queuedPos.clear();
@@ -150,6 +160,12 @@ public final class LiteTab {
         boolean meteorHeader = meteorText && !namesOnly;
         Object font = meteorText ? meteordevelopment.meteorclient.renderer.text.TextRenderer.get() : null;
 
+        jj = module.jjsTheme.get();
+        if (jj && System.currentTimeMillis() - paletteAt > 500) {
+            palette = dev.jjstools.panel.Ui.palette(dev.jjstools.panel.Ui.currentTheme());
+            paletteAt = System.currentTimeMillis();
+        }
+
         int height = module.height.get();
         boolean autoFit = module.autoFit.get();
         boolean anchor = module.anchor.get();
@@ -160,7 +176,8 @@ public final class LiteTab {
         int maxAge = module.cacheTime.get();
         boolean stale = list != keyEntries || header != keyHeader || footer != keyFooter
             || screenW != keyWidth || screenH != keyHeight || userScale != keyScale
-            || flags != keyFlags || font != keyFont
+            || flags != keyFlags || font != keyFont || jj != keyJj
+            || (jj && !java.util.Arrays.equals(palette, keyPalette))
             || maxAge <= 0 || System.currentTimeMillis() - builtAt > maxAge;
 
         if (stale) {
@@ -174,6 +191,8 @@ public final class LiteTab {
             keyScale = userScale;
             keyFlags = flags;
             keyFont = font;
+            keyJj = jj;
+            keyPalette = palette.clone();
             builtAt = System.currentTimeMillis();
         }
 
@@ -194,6 +213,7 @@ public final class LiteTab {
         if (meteorText) {
             queued = !queuedLines.isEmpty();
             queuedShadow = shadow;
+            queuedAt = System.nanoTime();
         }
     }
 
@@ -205,12 +225,20 @@ public final class LiteTab {
         int listTop = headerH;
         int listLeft = (boxW - listW) / 2;
 
-        ctx.fill(-1, -1, boxW + 1, listTop + rows * ROW, fade(BOX));
+        if (jj) {
+            // One rounded panel behind everything, and the list itself on a rounded well.
+            int totalH = listTop + rows * ROW + (footerLines.isEmpty() ? 0 : footerLines.size() * ROW + 1);
+            round(ctx, -1 - PAD, -1 - PAD, boxW + 2 + PAD * 2, totalH + 1 + PAD * 2, RADIUS, fade(palette[0]));
+            if (n > 0) round(ctx, listLeft - 2, listTop - 1, listW + 4, rows * ROW + 1, RADIUS - 1, fade(palette[1]));
+        } else {
+            ctx.fill(-1, -1, boxW + 1, listTop + rows * ROW, fade(BOX));
+        }
 
         for (int i = 0; i < headerLines.size(); i++) {
             int x = centre - headerWidths[i] / 2;
             int y = i * ROW;
             int override = headerOverride(module, i);
+            if (override == 0 && jj) override = i == 0 ? palette[3] : palette[4];
             if (override != 0) {
                 if (meteorHeader) queue(solid(headerPlain[i], override), x, y);
                 else ctx.drawText(tr, headerPlain[i], x, y, fade(override), shadow);
@@ -218,7 +246,7 @@ public final class LiteTab {
             else ctx.drawText(tr, headerLines.get(i), x, y, fade(-1), shadow);
         }
 
-        for (int c = 0; c < cols; c++) {
+        for (int c = 0; c < cols && !jj; c++) {
             int inCol = Math.min(rows, n - c * rows);
             if (inCol <= 0) break;
             int x = listLeft + c * (entryW + GAP);
@@ -244,17 +272,19 @@ public final class LiteTab {
             else ctx.drawText(tr, names[i], x, y, fade(spectator[i] ? SPECTATOR : -1), shadow);
         }
 
-        for (int i = 0; i < n; i++) {
+        // No ping under JJ's theme: just the names.
+        for (int i = 0; i < n && !jj; i++) {
             TabHooks.latency(hud, ctx, entryW, listLeft + colX(i), rowY(i, listTop), entries[i]);
         }
 
         if (!footerLines.isEmpty()) {
             int fy = listTop + rows * ROW + 1;
-            ctx.fill(-1, fy - 1, boxW + 1, fy + footerLines.size() * ROW, fade(BOX));
+            if (!jj) ctx.fill(-1, fy - 1, boxW + 1, fy + footerLines.size() * ROW, fade(BOX));
             for (int i = 0; i < footerLines.size(); i++) {
                 int x = centre - footerWidths[i] / 2;
                 int y = fy + i * ROW;
                 int override = module.recolourFooter.get() ? module.footerColour.get().getPacked() : 0;
+                if (override == 0 && jj) override = palette[5];
                 if (override != 0) {
                     if (meteorHeader) queue(solid(footerPlain[i], override), x, y);
                     else ctx.drawText(tr, footerPlain[i], x, y, fade(override), shadow);
@@ -262,6 +292,29 @@ public final class LiteTab {
                 else ctx.drawText(tr, footerLines.get(i), x, y, fade(-1), shadow);
             }
         }
+    }
+
+    /**
+     * A rounded rectangle through the GUI. The corners are quarter circles baked at the size
+     * they come out on screen, so they stay smooth at any GUI and tab list scale.
+     */
+    private static void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb) {
+        r = Math.min(r, Math.min(w, h) / 2);
+        if (r < 1) {
+            ctx.fill(x, y, x + w, y + h, argb);
+            return;
+        }
+        ctx.fill(x + r, y, x + w - r, y + h, argb);
+        ctx.fill(x, y + r, x + r, y + h - r, argb);
+        ctx.fill(x + w - r, y + r, x + w, y + h - r, argb);
+        double perUnit = MinecraftClient.getInstance().getWindow().getScaleFactor() * drawScale;
+        int rp = Math.max(1, (int) Math.round(r * perUnit));
+        var c = dev.jjstools.panel.UiShapes.circle(rp);
+        var pipe = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
+        ctx.drawTexture(pipe, c.id(), x, y, 0, 0, r, r, rp, rp, c.w(), c.h(), argb);
+        ctx.drawTexture(pipe, c.id(), x + w - r, y, rp, 0, r, r, rp, rp, c.w(), c.h(), argb);
+        ctx.drawTexture(pipe, c.id(), x, y + h - r, 0, rp, r, r, rp, rp, c.w(), c.h(), argb);
+        ctx.drawTexture(pipe, c.id(), x + w - r, y + h - r, rp, rp, r, r, rp, rp, c.w(), c.h(), argb);
     }
 
     /** Recolour for a header line, or 0 for none. Line 0 is the title, the rest are the server message. */
@@ -296,11 +349,42 @@ public final class LiteTab {
         return listTop + (i % rows) * ROW;
     }
 
+    /** When the tab list last queued its text, for drawing it every frame under Exordium. */
+    private static long queuedAt;
+
+    /**
+     * Under Exordium, called every frame after the GUI is drawn (ScreenOverlay): the tab list's
+     * text, drawn again from the last time the tab list itself was drawn.
+     *
+     * Exordium only lets the HUD draw every few frames and shows a saved copy between, so text
+     * drawn straight to the screen (Meteor's renderer, for the picked font) was there one frame
+     * and gone the next. Kept and drawn every frame, it stays, for as long as Exordium is still
+     * drawing the tab list behind it.
+     */
+    public static void drawEveryFrame() {
+        if (wantsEveryFrame()) drawLines();
+    }
+
+    /** Whether there is tab list text to draw this frame. */
+    public static boolean wantsEveryFrame() {
+        return queued && !queuedLines.isEmpty() && System.nanoTime() - queuedAt <= 150_000_000L;
+    }
+
     /** Called from TabOptimizer's Render2DEvent handler, after the vanilla GUI is on screen. */
     public static void drawQueuedText() {
         if (!queued) return;
+        // Under Exordium it is drawn every frame from ScreenOverlay instead.
+        if (TabOptimizer.EXORDIUM) {
+            queuedAt = System.nanoTime();
+            return;
+        }
         queued = false;
+        drawLines();
+        queuedLines.clear();
+        queuedPos.clear();
+    }
 
+    private static void drawLines() {
         MinecraftClient mc = MinecraftClient.getInstance();
         double gs = mc.getWindow().getScaleFactor();
         double s = drawScale;
@@ -318,9 +402,6 @@ public final class LiteTab {
             }
         }
         text.end();
-
-        queuedLines.clear();
-        queuedPos.clear();
     }
 
     private static void queue(Line line, int x, int y) {
@@ -344,6 +425,18 @@ public final class LiteTab {
             PlayerListEntry e = entries[i];
             names[i] = hud.getPlayerName(e); // goes through Better Tab's friend/self colours
             spectator[i] = e.getGameMode() == GameMode.SPECTATOR;
+            // Friends in Meteor's friend colour whether or not Better Tab is on; under JJ's theme
+            // everyone else in the plain text colour, the server's own name colours left out.
+            int colour = 0;
+            if (meteordevelopment.meteorclient.systems.friends.Friends.get().isFriend(e)) {
+                colour = meteordevelopment.meteorclient.systems.config.Config.get().friendColor.get().getPacked();
+            } else if (jj) {
+                colour = spectator[i] ? palette[5] : palette[4];
+            }
+            if (colour != 0) {
+                int rgb = colour & 0xFFFFFF;
+                names[i] = Text.literal(plain(names[i].asOrderedText())).styled(st -> st.withColor(rgb));
+            }
             if (meteorText) {
                 nameLines[i] = runs(names[i], spectator[i] ? SPECTATOR : WHITE);
                 maxName = Math.max(maxName, (int) Math.ceil(nameLines[i].width));
@@ -353,7 +446,7 @@ public final class LiteTab {
         }
 
         // Every column is wide enough for the longest name, so names never run into the next column.
-        entryW = (heads ? 9 : 0) + maxName + 2 + (accurate ? 34 : 12);
+        entryW = (heads ? 9 : 0) + maxName + 2 + (jj ? 2 : accurate ? 34 : 12);
 
         int wrap = Math.max(50, screenW - 50);
         headerLines = header == null ? List.of() : tr.wrapLines(header, wrap);
@@ -386,8 +479,9 @@ public final class LiteTab {
             textW = Math.max(textW, footerWidths[i]);
         }
 
+        int pad = jj ? PAD : 0;
         int extraH = (headerLines.isEmpty() ? 0 : headerLines.size() * ROW + 1)
-            + (footerLines.isEmpty() ? 0 : footerLines.size() * ROW + 1) + 2;
+            + (footerLines.isEmpty() ? 0 : footerLines.size() * ROW + 1) + 2 + pad * 2;
         int availW = screenW - 2 * EDGE;
         int availH = screenH - TOP - EDGE;
 
@@ -418,13 +512,14 @@ public final class LiteTab {
         if (autoFit) drawScale = (float) Math.min(userScale, fitScale(listW, textW, boxH - 2, availW, availH));
 
         // Position: centred at the top like vanilla, pushed back inside the screen if it would run off.
-        float w = (boxW + 2) * drawScale;
+        float w = (boxW + 2 + pad * 2) * drawScale;
         float h = boxH * drawScale;
-        originX = screenW / 2.0f - w / 2.0f + drawScale;
-        originY = TOP;
+        float inset = (1 + pad) * drawScale;
+        originX = screenW / 2.0f - w / 2.0f + inset;
+        originY = TOP + pad * drawScale;
         if (anchor) {
-            originX = clamp(originX, EDGE + drawScale, screenW - EDGE - w + drawScale);
-            originY = clamp(originY, EDGE + drawScale, screenH - EDGE - h + drawScale);
+            originX = clamp(originX, EDGE + inset, screenW - EDGE - w + inset);
+            originY = clamp(originY, EDGE + pad * drawScale, screenH - EDGE - h + pad * drawScale);
         }
     }
 

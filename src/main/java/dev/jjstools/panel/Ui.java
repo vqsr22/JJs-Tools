@@ -723,22 +723,43 @@ public final class Ui {
             fill(x, y, w, h, argb);
             return;
         }
+        inPixels(x, y, w, h, (px, py, pw, ph) -> roundPixels(px, py, pw, ph, pr, argb));
+    }
+
+    /**
+     * A rounded box with a ring round it, the ring thick units wide on every side.
+     *
+     * Worked out in screen pixels from one rounded outline, the inside pulled in by the same
+     * whole number of pixels on all four sides. Drawn as two separate boxes, each was rounded to
+     * pixels on its own, so the ring came out a pixel thicker on some sides than others.
+     */
+    public void ring(int x, int y, int w, int h, float r, float thick, int ringArgb, int fillArgb) {
+        if (w <= 0 || h <= 0) return;
+        float ppu = pixelsPerUnit();
+        int pr = Math.round(r * ppu);
+        int t = Math.max(1, Math.round(thick * ppu));
         inPixels(x, y, w, h, (px, py, pw, ph) -> {
-            int rr = Math.min(pr, Math.min(pw, ph) / 2);
-            if (rr < 1) {
-                ctx.fill(px, py, px + pw, py + ph, argb);
-                return;
-            }
-            added(7);
-            ctx.fill(px + rr, py, px + pw - rr, py + ph, argb);
-            ctx.fill(px, py + rr, px + rr, py + ph - rr, argb);
-            ctx.fill(px + pw - rr, py + rr, px + pw, py + ph - rr, argb);
-            UiShapes.Shape c = UiShapes.circle(rr);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py, 0, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py, rr, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py + ph - rr, 0, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py + ph - rr, rr, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
+            roundPixels(px, py, pw, ph, pr, ringArgb);
+            if (pw > t * 2 && ph > t * 2) roundPixels(px + t, py + t, pw - t * 2, ph - t * 2, Math.max(0, pr - t), fillArgb);
         });
+    }
+
+    private void roundPixels(int px, int py, int pw, int ph, int pr, int argb) {
+        if ((argb >>> 24) == 0) return;
+        int rr = Math.min(pr, Math.min(pw, ph) / 2);
+        if (rr < 1) {
+            ctx.fill(px, py, px + pw, py + ph, argb);
+            return;
+        }
+        added(7);
+        ctx.fill(px + rr, py, px + pw - rr, py + ph, argb);
+        ctx.fill(px, py + rr, px + rr, py + ph - rr, argb);
+        ctx.fill(px + pw - rr, py + rr, px + pw, py + ph - rr, argb);
+        UiShapes.Shape c = UiShapes.circle(rr);
+        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py, 0, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py, rr, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py + ph - rr, 0, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py + ph - rr, rr, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
     }
 
     private void shape(java.util.function.BiFunction<Integer, Integer, UiShapes.Shape> make, int x, int y, int w, int h, int argb) {

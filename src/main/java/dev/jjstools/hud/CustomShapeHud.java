@@ -37,11 +37,11 @@ public class CustomShapeHud extends HudElement {
 
     private final Setting<Integer> width = sgShape.add(new IntSetting.Builder()
         .name("width").description("How wide the shape is, in pixels. For a line, how long it is.")
-        .defaultValue(60).min(1).max(2000).sliderRange(1, 400).build());
+        .defaultValue(40).min(1).max(2000).sliderRange(1, 400).build());
 
     private final Setting<Integer> height = sgShape.add(new IntSetting.Builder()
         .name("height").description("How tall the shape is, in pixels.")
-        .defaultValue(30).min(1).max(2000).sliderRange(1, 400)
+        .defaultValue(40).min(1).max(2000).sliderRange(1, 400)
         .visible(() -> shape.get() != Shape.Line).build());
 
     private final Setting<Integer> cornerRadius = sgShape.add(new IntSetting.Builder()
@@ -225,6 +225,19 @@ public class CustomShapeHud extends HudElement {
 
     // Drawing
 
+    /**
+     * One triangle, its corners put in the order Meteor's HUD draws.
+     *
+     * Meteor's HUD leaves out triangles whose corners run the other way round, as it does the
+     * backs of things in 3D, and the shapes' points went round the wrong way, so nothing showed
+     * at all. Each triangle is now turned to face the right way, whichever way it was given.
+     */
+    private static void tri(HudRenderer renderer, double x1, double y1, double x2, double y2, double x3, double y3, Color colour) {
+        double cross = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1);
+        if (cross > 0) renderer.triangle(x1, y1, x3, y3, x2, y2, colour);
+        else renderer.triangle(x1, y1, x2, y2, x3, y3, colour);
+    }
+
     /** Fills a shape that bulges outwards everywhere, as triangles from its middle. */
     private static void fan(HudRenderer renderer, List<double[]> points, Color colour) {
         if (points.size() < 3) return;
@@ -240,7 +253,7 @@ public class CustomShapeHud extends HudElement {
         for (int i = 0; i < points.size(); i++) {
             double[] p = points.get(i);
             double[] q = points.get((i + 1) % points.size());
-            renderer.triangle(cx, cy, p[0], p[1], q[0], q[1], colour);
+            tri(renderer, cx, cy, p[0], p[1], q[0], q[1], colour);
         }
     }
 
@@ -250,8 +263,8 @@ public class CustomShapeHud extends HudElement {
         for (int i = 0; i < n; i++) {
             double[] o1 = outer.get(i), o2 = outer.get((i + 1) % n);
             double[] i1 = inner.get(i), i2 = inner.get((i + 1) % n);
-            renderer.triangle(o1[0], o1[1], o2[0], o2[1], i2[0], i2[1], colour);
-            renderer.triangle(o1[0], o1[1], i2[0], i2[1], i1[0], i1[1], colour);
+            tri(renderer, o1[0], o1[1], o2[0], o2[1], i2[0], i2[1], colour);
+            tri(renderer, o1[0], o1[1], i2[0], i2[1], i1[0], i1[1], colour);
         }
     }
 
@@ -274,7 +287,7 @@ public class CustomShapeHud extends HudElement {
         double bx = cx + dx, by = cy + dy;
 
         Color colour = lineColour.get();
-        renderer.triangle(ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny, colour);
-        renderer.triangle(ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny, colour);
+        tri(renderer, ax + nx, ay + ny, bx + nx, by + ny, bx - nx, by - ny, colour);
+        tri(renderer, ax + nx, ay + ny, bx - nx, by - ny, ax - nx, ay - ny, colour);
     }
 }

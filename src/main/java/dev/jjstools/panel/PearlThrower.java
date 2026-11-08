@@ -80,7 +80,7 @@ public final class PearlThrower {
         int last = -1;
     }
 
-    private enum Step { Idle, Arriving, Settling, ToChest, Opening, ToStand, Flipping, Edging, Aiming, Throwing, Letting }
+    private enum Step { Idle, Arriving, Settling, ToChest, Opening, ToStand, Flipping, Edging, Aiming, Throwing, Letting, Retrieving }
 
     private Saved saved;
     private Bot job;
@@ -118,6 +118,18 @@ public final class PearlThrower {
      * Whatever had been in that hotbar slot went there, and is put back once the pearl is thrown.
      */
     private int movedFrom = -1;
+    /**
+     * What was in the ninth hotbar slot when it was dropped to make room for a pearl, with your
+     * inventory full, and where you were when it went. Picked back up at the end.
+     */
+    private net.minecraft.item.ItemStack dropped;
+    private Vec3d droppedAt;
+    /** What to say once the dropped item is back: null after a throw, a reason after giving up. */
+    private String afterRetrieve;
+    private long droppedTime;
+    /** Where the pearl was first seen near you, which is where it came from. */
+    private Vec3d pearlFrom;
+    private boolean retrieveFailed;
 
     private boolean subscribed;
 
@@ -235,6 +247,12 @@ public final class PearlThrower {
         if (freeLookMode == null) return;
         FreeLook fl = Modules.get().get(FreeLook.class);
         if (fl != null) {
+            // You carry on looking where you were looking while it ran, rather than the view
+            // jumping to wherever the throw left your player facing.
+            if (fl.isActive() && mc.player != null) {
+                mc.player.setYaw(fl.cameraYaw);
+                mc.player.setPitch(fl.cameraPitch);
+            }
             if (fl.isActive()) fl.toggle();
             fl.mode.set(freeLookMode);
             fl.togglePerspective.set(freeLookToggle);
@@ -244,8 +262,12 @@ public final class PearlThrower {
 
     private void cleanUp() {
         putBack();
-        // Looking straight ahead again rather than down at the water.
-        if (mc.player != null && (step == Step.Edging || step == Step.Aiming || step == Step.Throwing || step == Step.Letting)) mc.player.setPitch(0);
+        dropped = null;
+        droppedAt = null;
+        pearlFrom = null;
+        // Looking straight ahead again rather than down at the water, unless free look was on,
+        // which hands back the view you had instead.
+        if (mc.player != null && freeLookMode == null && (step == Step.Edging || step == Step.Aiming || step == Step.Throwing || step == Step.Letting)) mc.player.setPitch(0);
         stopFreeLook();
         if (walking) StashWalker.stopPath();
         walking = false;
@@ -423,9 +445,37 @@ public final class PearlThrower {
                     water = waterOf(chamber);
                     stand = standSpot(chamber);
                 }
+                // Facing the trapdoor the whole time you wait, so anything dropped to make room
+                // for a pearl lands on it, against the wall, and never goes the pearlbot's way.
+                // With free look on your view stays where it is.
+                faceTrapdoor();
+                boolean pearl = InvUtils.find(Items.ENDER_PEARL).found();
+                boolean full = mc.player.getInventory().getEmptySlot() == -1;
+                // Watched from the moment you land, so where a pearl is first seen is close to
+                // where it was thrown from.
+                if (pearlFrom == null) pearlNearby();
+                // A full inventory cannot pick up a pearl, so once a pearl is thrown or given to
+                // you (a pearl lying on the ground near you), the ninth slot is emptied for it.
+                // Nothing is dropped unless a pearl is actually coming.
+                if (!pearl && full) {
+                    var held = mc.player.getInventory().getStack(8);
+                    if (dropped == null) {
+                        var coming = pearlNearby();
+                        if (coming != null) dropNinth(held, coming);
+                    } else if (net.minecraft.item.ItemStack.areItemsAndComponentsEqual(held, dropped)) {
+                        // Your own dropped items can be picked up again after two seconds; if it
+                        // came back before the pearl, it goes out again, the same way.
+                        dropNinth(held, pearlNearby());
+                    }
+                }
                 if (elapsed() < ControlPanel.pearlWaitTime() * 1000) return;
-                if (InvUtils.find(Items.ENDER_PEARL).found()) {
+                if (pearl) {
                     toStand();
+                } else if (dropped != null) {
+                    // Room was made: the pearl has the wait time from then to be picked up, or
+                    // the throw is stopped and the item picked back up.
+                    if (System.currentTimeMillis() - droppedTime < ControlPanel.pearlWaitTime() * 1000) return;
+                    retrieve("No pearl came within " + ControlPanel.pearlWaitTime() + " seconds, so the throw was stopped.", true);
                 } else if (Bot.pos(job.chest) != null) {
                     walking = StashWalker.pathTo(Bot.pos(job.chest), false);
                     pathAt = System.currentTimeMillis();
@@ -620,17 +670,102 @@ public final class PearlThrower {
                 // Back to the middle of the block you threw from, still crouched, facing the water
                 // and looking straight ahead.
                 mc.options.sneakKey.setPressed(true);
-                mc.player.setPitch(0);
+                if (freeLookMode == null) mc.player.setPitch(0);
                 mc.player.setYaw((float) Rotations.getYaw(Vec3d.ofCenter(water)));
                 mc.options.backKey.setPressed(true);
                 if (past() > -0.45 && elapsed() < 2000) return;
                 mc.options.backKey.setPressed(false);
                 mc.options.sneakKey.setPressed(false);
-                finish("Reset the stasis chamber at " + job.label() + ".");
+                if (dropped != null) retrieve("Reset the stasis chamber at " + job.label() + ".", false);
+                else finish("Reset the stasis chamber at " + job.label() + ".");
+            }
+            case Retrieving -> {
+                // Walks onto the item dropped to make room, until it is picked up or gone.
+                var item = droppedItem();
+                if (item == null || elapsed() > 10_000) {
+                    if (walking) StashWalker.stopPath();
+                    walking = false;
+                    String words = afterRetrieve;
+                    if (item != null) words += " Could not pick the dropped " + dropped.getName().getString().toLowerCase(java.util.Locale.ROOT) + " back up.";
+                    if (retrieveFailed) fail(words);
+                    else finish(words);
+                    return;
+                }
+                if (!keepWalking(item.getBlockPos(), true)) {
+                    if (walking) StashWalker.stopPath();
+                    walking = false;
+                    String words = afterRetrieve + " Could not walk to the dropped " + dropped.getName().getString().toLowerCase(java.util.Locale.ROOT) + ".";
+                    if (retrieveFailed) fail(words);
+                    else finish(words);
+                }
             }
             default -> {
             }
         }
+    }
+
+    /** A pearl lying on the ground near you, thrown or given by the pearlbot, or null. */
+    private net.minecraft.entity.ItemEntity pearlNearby() {
+        for (var e : mc.world.getEntities()) {
+            if (e instanceof net.minecraft.entity.ItemEntity item && item.isAlive()
+                && item.getStack().isOf(Items.ENDER_PEARL)
+                && item.squaredDistanceTo(mc.player) <= 8 * 8) {
+                if (pearlFrom == null) pearlFrom = item.getEntityPos();
+                return item;
+            }
+        }
+        return null;
+    }
+
+    /** Drops the ninth hotbar slot to make room for a pearl, onto the trapdoor you are facing. */
+    private void dropNinth(net.minecraft.item.ItemStack held, net.minecraft.entity.ItemEntity pearlItem) {
+        // Already facing the trapdoor since you landed, so it goes there.
+        if (dropped == null) {
+            dropped = held.copy();
+            droppedAt = mc.player.getEntityPos();
+            status = "pearl coming, inventory full: dropped " + held.getName().getString().toLowerCase(java.util.Locale.ROOT) + " onto the trapdoor";
+        }
+        droppedTime = System.currentTimeMillis();
+        InvUtils.drop().slotHotbar(8);
+    }
+
+    /** Faces the chamber's trapdoor, a little past its middle, so a dropped item settles against the wall behind. */
+    private void faceTrapdoor() {
+        if (chamber == null) return;
+        Vec3d centre = Vec3d.ofCenter(chamber);
+        Vec3d me = mc.player.getEyePos();
+        Vec3d flat = new Vec3d(centre.x - me.x, 0, centre.z - me.z);
+        if (flat.lengthSquared() > 1.0E-4) flat = flat.normalize().multiply(0.35);
+        Vec3d target = new Vec3d(centre.x + flat.x, chamber.getY() + 0.6, centre.z + flat.z);
+        mc.player.setYaw((float) Rotations.getYaw(target));
+        mc.player.setPitch((float) Math.max(-30.0, Math.min(80.0, Rotations.getPitch(target))));
+    }
+
+    /** Goes to pick up the item dropped to make room, then finishes, or fails when failed is true, with words. */
+    private void retrieve(String words, boolean failed) {
+        afterRetrieve = words;
+        retrieveFailed = failed;
+        walking = false;
+        pathAt = 0;
+        retries = 0;
+        go(Step.Retrieving, "picking the dropped item back up");
+    }
+
+    /** The item dropped to make room, still on the ground near where it was dropped, or null. */
+    private net.minecraft.entity.ItemEntity droppedItem() {
+        if (dropped == null || droppedAt == null) return null;
+        net.minecraft.entity.ItemEntity best = null;
+        double bestDist = 8 * 8;
+        for (var e : mc.world.getEntities()) {
+            if (!(e instanceof net.minecraft.entity.ItemEntity item) || !item.isAlive()) continue;
+            if (!net.minecraft.item.ItemStack.areItemsAndComponentsEqual(item.getStack(), dropped)) continue;
+            double d = item.getEntityPos().squaredDistanceTo(droppedAt);
+            if (d < bestDist) {
+                bestDist = d;
+                best = item;
+            }
+        }
+        return best;
     }
 
     /** Puts what was in the ninth hotbar slot back there, the pearl now thrown, if the pearl had moved it. */

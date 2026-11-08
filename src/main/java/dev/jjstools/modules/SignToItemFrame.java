@@ -47,7 +47,6 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.state.property.Properties;
-import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.BlockRenderView;
 import net.minecraft.world.BlockView;
@@ -194,7 +193,7 @@ public class SignToItemFrame extends Module {
 
     /** Parsed signs, because the renderer asks the same question of the same sign every frame. */
     private static final Map<String, ItemStack> CACHE = Collections.synchronizedMap(new HashMap<>());
-    private static final int CACHE_LIMIT = 512;
+    private static final int CACHE_LIMIT = 4096;
 
     /*
      * Two caches, both keyed by identity, both there because this runs per sign per frame.
@@ -210,6 +209,11 @@ public class SignToItemFrame extends Module {
      */
     private static final Map<SignText, ItemStack> BY_TEXT = Collections.synchronizedMap(new IdentityHashMap<>());
     private static final Map<ItemStack, ItemRenderState> STATES = new IdentityHashMap<>();
+    /** The render thread's own copy of BY_TEXT, read without a lock. */
+    private static final Map<SignText, ItemStack> RENDER_BY_TEXT = new IdentityHashMap<>();
+    private static Thread renderThread;
+    private static volatile int namesVersion;
+    private static int renderNamesVersion;
 
     /** Stands in for "this text names nothing", so a miss is not worked out again every frame. */
     private static final ItemStack NOTHING = new ItemStack(Items.AIR);
@@ -285,14 +289,31 @@ public class SignToItemFrame extends Module {
     private static @Nullable ItemStack fromText(@Nullable SignText text) {
         if (text == null) return null;
 
+        // The render thread asks for every sign every frame, so it has its own copy with no lock:
+        // waiting on the shared one, which chunk building also uses, showed up in profiles.
+        boolean render = Thread.currentThread() == renderThread;
+        if (render) {
+            if (renderNamesVersion != namesVersion) {
+                renderNamesVersion = namesVersion;
+                RENDER_BY_TEXT.clear();
+            }
+            ItemStack mine = RENDER_BY_TEXT.get(text);
+            if (mine != null) return mine == NOTHING ? null : mine;
+        }
+
         // One identity lookup stands in for rebuilding every candidate string again.
         ItemStack known = BY_TEXT.get(text);
-        if (known != null) return known == NOTHING ? null : known;
-
-        ItemStack found = read(text);
-        if (BY_TEXT.size() >= CACHE_LIMIT) BY_TEXT.clear();
-        BY_TEXT.put(text, found == null ? NOTHING : found);
-        return found;
+        if (known == null) {
+            ItemStack found = read(text);
+            known = found == null ? NOTHING : found;
+            if (BY_TEXT.size() >= CACHE_LIMIT) BY_TEXT.clear();
+            BY_TEXT.put(text, known);
+        }
+        if (render) {
+            if (RENDER_BY_TEXT.size() >= CACHE_LIMIT) RENDER_BY_TEXT.clear();
+            RENDER_BY_TEXT.put(text, known);
+        }
+        return known == NOTHING ? null : known;
     }
 
     private static @Nullable ItemStack read(SignText text) {
@@ -467,6 +488,8 @@ public class SignToItemFrame extends Module {
         byName = null;
         CACHE.clear();
         BY_TEXT.clear();
+        // The render thread empties its own copy when it next looks, as only it touches that.
+        namesVersion++;
     }
 
     /** Every trim material and pattern the game ships, by the word you would write. */
@@ -576,13 +599,25 @@ public class SignToItemFrame extends Module {
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.world == null) return false;
-        if (!(mc.world.getBlockEntity(state.pos) instanceof SignBlockEntity sign)) return false;
+        if (renderThread == null) renderThread = Thread.currentThread();
 
         SignToItemFrame module = get();
         if (module == null) return false;
 
-        ItemStack front = fromText(sign.getText(true));
-        ItemStack back = module.bothSides.get() ? fromText(sign.getText(false)) : null;
+        // The writing is already in the render state, so the sign is not looked up in the world.
+        SignText frontText, backText;
+        if (state instanceof SignBlockEntityRenderState signState && signState.frontText != null) {
+            frontText = signState.frontText;
+            backText = signState.backText;
+        } else if (mc.world.getBlockEntity(state.pos) instanceof SignBlockEntity sign) {
+            frontText = sign.getText(true);
+            backText = sign.getText(false);
+        } else {
+            return false;
+        }
+
+        ItemStack front = fromText(frontText);
+        ItemStack back = module.bothSides.get() ? fromText(backText) : null;
         if (front == null && back == null) return false;
 
         float yaw = faceYaw(state.blockState);
@@ -703,7 +738,44 @@ public class SignToItemFrame extends Module {
     }
 
     /** The compass direction the writing faces, in degrees. */
+    /**
+     * A turn about the up axis, straight on the matrices.
+     *
+     * The usual way builds a rotation and multiplies it in as a general turn, which was most of
+     * this module's cost in a profile: with a few signs on screen it ran thousands of times a
+     * second. A turn about one axis is far cheaper to apply as just that.
+     */
+    private static void turnY(MatrixStack matrices, float degrees) {
+        float radians = (float) Math.toRadians(degrees);
+        MatrixStack.Entry entry = matrices.peek();
+        entry.getPositionMatrix().rotateY(radians);
+        entry.getNormalMatrix().rotateY(radians);
+    }
+
+    /** The two item frame states, looked up once rather than built from the state table every sign, every frame. */
+    private static BlockState frameState, glowFrameState;
+
+    private static BlockState frameState(boolean glow) {
+        if (glow) {
+            if (glowFrameState == null) glowFrameState = BlockStateManagers.getStateForItemFrame(true, false);
+            return glowFrameState;
+        }
+        if (frameState == null) frameState = BlockStateManagers.getStateForItemFrame(false, false);
+        return frameState;
+    }
+
+    /** Which way each sign state faces, worked out once per state; states are shared, so this stays small. */
+    private static final Map<BlockState, Float> YAWS = new IdentityHashMap<>();
+
     private static float faceYaw(BlockState blockState) {
+        Float known = YAWS.get(blockState);
+        if (known != null) return known;
+        float yaw = workOutYaw(blockState);
+        YAWS.put(blockState, yaw);
+        return yaw;
+    }
+
+    private static float workOutYaw(BlockState blockState) {
         if (blockState.contains(Properties.ROTATION)) {
             return blockState.get(Properties.ROTATION) * 360.0F / 16.0F;
         }
@@ -730,7 +802,7 @@ public class SignToItemFrame extends Module {
          */
         matrices.push();
         matrices.translate(0.5, centre, 0.5);
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-yaw));
+        turnY(matrices, -yaw);
 
         // Out to the board.
         matrices.translate(0.0, 0.0, depth);
@@ -765,7 +837,7 @@ public class SignToItemFrame extends Module {
     private static void frame(SignToItemFrame module, MinecraftClient mc, MatrixStack matrices,
                               OrderedRenderCommandQueue queue, Frame style, int light) {
         BlockStateModel model = mc.getBlockRenderManager()
-            .getModel(BlockStateManagers.getStateForItemFrame(style == Frame.Glow, false));
+            .getModel(frameState(style == Frame.Glow));
         if (model == null) return;
 
         // A glow frame lights its own contents, the same as the entity does.
@@ -774,7 +846,7 @@ public class SignToItemFrame extends Module {
         float size = module.frameSize.get().floatValue();
 
         matrices.push();
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F));
+        turnY(matrices, 180.0F);
         matrices.scale(size, size, 1.0F);
 
         /*
@@ -812,7 +884,7 @@ public class SignToItemFrame extends Module {
          * The same half turn the frame needs undoes it.
          */
         matrices.push();
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F));
+        turnY(matrices, 180.0F);
         matrices.scale(size, size, size);
         render.render(matrices, queue, light, OverlayTexture.DEFAULT_UV, 0);
         matrices.pop();

@@ -58,6 +58,15 @@ public class TabOptimizer extends Module {
         .build()
     );
 
+    public final Setting<Boolean> jjsTheme = sgLite.add(new BoolSetting.Builder()
+        .name("jjs-theme")
+        .description("Draw the tab list in JJ's theme: one rounded panel in the Control Panel's theme colours, names in plain text colour, friends in Meteor's friend colour, the server's name in the accent colour, and ping as a small number instead of bars.")
+        .defaultValue(true)
+        .visible(liteRenderer::get)
+        .onChanged(v -> LiteTab.invalidate())
+        .build()
+    );
+
     public final Setting<Integer> height = sgLite.add(new IntSetting.Builder()
         .name("height")
         .description("Players per column, which sets how tall the list is. 0: picked automatically with auto-fit, otherwise Better Tab's tab-height or vanilla's 20.")
@@ -257,6 +266,14 @@ public class TabOptimizer extends Module {
     public static TabOptimizer get() {
         return INSTANCE;
     }
+
+    /**
+     * Exordium lets the HUD draw only every few frames and shows a saved copy in between. Text
+     * Meteor draws straight to the screen is not in that copy, so with Exordium loaded the tab
+     * list's text, and Incognito's covers, are drawn every frame after the GUI instead
+     * (ScreenOverlay).
+     */
+    public static final boolean EXORDIUM = net.fabricmc.loader.api.FabricLoader.getInstance().isModLoaded("exordium");
 
     public static boolean on() {
         TabOptimizer module = INSTANCE;

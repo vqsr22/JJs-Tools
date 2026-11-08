@@ -113,10 +113,14 @@ public class WSwatch extends WPressable {
     @Override
     protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
         double r = theme.scale(4);
-        double s = theme.scale(1.5);
         if (picked) {
-            JJDraw.round(renderer, x, y, width, height, r, accent);
-            JJDraw.round(renderer, x + s, y + s, width - s * 2, height - s * 2, Math.max(0, r - s), mouseOver ? text : background);
+            // On whole pixels first, then pulled in by the same whole number on every side, so
+            // the ring is even all round; drawn from fractions, each side rounded its own way.
+            int x0 = (int) Math.round(x), y0 = (int) Math.round(y);
+            int x1 = (int) Math.round(x + width), y1 = (int) Math.round(y + height);
+            int s = (int) Math.max(2, Math.round(theme.scale(3)));
+            JJDraw.round(renderer, x0, y0, x1 - x0, y1 - y0, r, accent);
+            JJDraw.round(renderer, x0 + s, y0 + s, x1 - x0 - s * 2, y1 - y0 - s * 2, Math.max(0, r - s), mouseOver ? text : background);
         } else {
             JJDraw.round(renderer, x, y, width, height, r, mouseOver ? text : background);
         }

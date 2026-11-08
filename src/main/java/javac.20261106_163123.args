@@ -1,7 +1,0 @@
--proc:none
--d
-/tmp/jc
--sourcepath
-.
-dev/jjstools/modules/StasisPearlThrower.java
-dev/jjstools/panel/panels/PearlsPanel.java

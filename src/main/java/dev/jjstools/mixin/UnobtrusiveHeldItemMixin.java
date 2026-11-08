@@ -9,6 +9,8 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.Arm;
 import net.minecraft.util.Hand;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -69,6 +71,16 @@ public abstract class UnobtrusiveHeldItemMixin {
      * turns the item. Stopping just before that call keeps the bob and hands everything after it
      * to Unobtrusive, which does the lift itself and turns the item level instead.
      */
+    /** Slows and shrinks the eating bob, the only cosine in the eating animation. */
+    @WrapOperation(
+        method = "applyEatOrDrinkTransformation",
+        at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/MathHelper;cos(D)F"),
+        require = 0
+    )
+    private float jjsTools$dampEatBob(double angle, Operation<Float> original) {
+        return Unobtrusive.eatBob(angle, a -> original.call(a));
+    }
+
     @Inject(
         method = "applyEatOrDrinkTransformation",
         at = @At(value = "INVOKE", target = "Ljava/lang/Math;pow(DD)D", shift = At.Shift.BEFORE),
