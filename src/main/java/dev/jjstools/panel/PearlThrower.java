@@ -343,7 +343,7 @@ public final class PearlThrower {
         retries = 0;
         chamber = null;
         stand = null;
-        lastPos = mc.player.getEntityPos();
+        lastPos = dev.jjstools.compat.Compat.pos(mc.player);
         pullPos = lastPos;
         lastDimension = dimension();
         if (pullQueued) {
@@ -356,7 +356,7 @@ public final class PearlThrower {
                 stop("give " + job.label() + " a pull message first");
                 return;
             }
-            String msg = template.trim().replace("{bot}", job.bot).replace("{player}", mc.player.getGameProfile().name());
+            String msg = template.trim().replace("{bot}", job.bot).replace("{player}", dev.jjstools.compat.Compat.name(mc.player.getGameProfile()));
             // Plain words are whispered to the pearlbot; a command is sent as it is.
             if (!msg.startsWith("/")) msg = "/msg " + job.bot + " " + msg;
             ChatUtils.sendPlayerMsg(msg);
@@ -417,7 +417,7 @@ public final class PearlThrower {
             case Arriving -> {
                 // The pull shows up as a jump in where you are: far in one tick, or another
                 // dimension. Where you land is next to the chamber your pearl was in.
-                Vec3d now = mc.player.getEntityPos();
+                Vec3d now = dev.jjstools.compat.Compat.pos(mc.player);
                 String dim = dimension();
                 // Or, if you were near the base already, the server moving you a few blocks after
                 // the message went.
@@ -596,7 +596,7 @@ public final class PearlThrower {
             }
             case Edging -> {
                 // Leaning out moves you a little over the water, so only a real move away counts.
-                Vec3d at = mc.player.getEntityPos();
+                Vec3d at = dev.jjstools.compat.Compat.pos(mc.player);
                 double ox = at.x - (stand.getX() + 0.5), oz = at.z - (stand.getZ() + 0.5);
                 if (rubberbanded(300) || fellIn() || ox * ox + oz * oz > 1.0) {
                     backToStand();
@@ -712,7 +712,7 @@ public final class PearlThrower {
             if (e instanceof net.minecraft.entity.ItemEntity item && item.isAlive()
                 && item.getStack().isOf(Items.ENDER_PEARL)
                 && item.squaredDistanceTo(mc.player) <= 8 * 8) {
-                if (pearlFrom == null) pearlFrom = item.getEntityPos();
+                if (pearlFrom == null) pearlFrom = dev.jjstools.compat.Compat.pos(item);
                 return item;
             }
         }
@@ -724,7 +724,7 @@ public final class PearlThrower {
         // Already facing the trapdoor since you landed, so it goes there.
         if (dropped == null) {
             dropped = held.copy();
-            droppedAt = mc.player.getEntityPos();
+            droppedAt = dev.jjstools.compat.Compat.pos(mc.player);
             status = "pearl coming, inventory full: dropped " + held.getName().getString().toLowerCase(java.util.Locale.ROOT) + " onto the trapdoor";
         }
         droppedTime = System.currentTimeMillis();
@@ -761,7 +761,7 @@ public final class PearlThrower {
         for (var e : mc.world.getEntities()) {
             if (!(e instanceof net.minecraft.entity.ItemEntity item) || !item.isAlive()) continue;
             if (!net.minecraft.item.ItemStack.areItemsAndComponentsEqual(item.getStack(), dropped)) continue;
-            double d = item.getEntityPos().squaredDistanceTo(droppedAt);
+            double d = dev.jjstools.compat.Compat.pos(item).squaredDistanceTo(droppedAt);
             if (d < bestDist) {
                 bestDist = d;
                 best = item;
@@ -900,7 +900,7 @@ public final class PearlThrower {
     private double past() {
         if (water == null || side == null) return 0;
         Vec3d edge = Vec3d.ofCenter(water).add(side.getOffsetX() * 0.5, 0, side.getOffsetZ() * 0.5);
-        Vec3d at = mc.player.getEntityPos();
+        Vec3d at = dev.jjstools.compat.Compat.pos(mc.player);
         return -((at.x - edge.x) * side.getOffsetX() + (at.z - edge.z) * side.getOffsetZ());
     }
 }

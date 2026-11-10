@@ -14,7 +14,11 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.gui.hud.PlayerListHud;
 import net.minecraft.client.network.PlayerListEntry;
+//#if MC >= 1.21.9
 import net.minecraft.entity.player.SkinTextures;
+//#else
+//$$ import net.minecraft.client.util.SkinTextures;
+//#endif
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.scoreboard.ScoreboardObjective;
 import net.minecraft.text.Text;
@@ -130,7 +134,11 @@ public abstract class PlayerListHudMixin implements TabHooks {
 
     @WrapOperation(
         method = "render",
+        //#if MC >= 1.21.9
         at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/PlayerListEntry;getSkinTextures()Lnet/minecraft/entity/player/SkinTextures;"),
+        //#else
+        //$$ at = @At(value = "INVOKE", target = "Lnet/minecraft/client/network/PlayerListEntry;getSkinTextures()Lnet/minecraft/client/util/SkinTextures;"),
+        //#endif
         require = 0
     )
     private SkinTextures jjstools$cachedSkin(PlayerListEntry entry, Operation<SkinTextures> original) {

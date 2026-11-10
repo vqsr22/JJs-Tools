@@ -1,7 +1,11 @@
 package dev.jjstools.tab;
 
 import net.minecraft.client.network.PlayerListEntry;
+//#if MC >= 1.21.9
 import net.minecraft.entity.player.SkinTextures;
+//#else
+//$$ import net.minecraft.client.util.SkinTextures;
+//#endif
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,7 +33,7 @@ public final class SkinCache {
             stamp = now;
         }
 
-        UUID id = entry.getProfile().id();
+        UUID id = dev.jjstools.compat.Compat.id(entry.getProfile());
         SkinTextures cached = CACHE.get(id);
         if (cached != null) return cached;
 

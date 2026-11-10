@@ -17,7 +17,6 @@ import meteordevelopment.meteorclient.settings.SettingGroup;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 import meteordevelopment.orbit.EventHandler;
-import net.minecraft.entity.EntityPosition;
 import net.minecraft.network.packet.c2s.play.PlayerMoveC2SPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
 import net.minecraft.text.MutableText;
@@ -184,11 +183,11 @@ public class RubberbandNotifier extends Module {
          * always that confirmation: one entry old, zero blocks away. That is why it always said one
          * tick with no deviation.
          */
-        Vec3d current = mc.player.getEntityPos();
+        Vec3d current = dev.jjstools.compat.Compat.pos(mc.player);
 
         Vec3d target;
         try {
-            target = EntityPosition.apply(EntityPosition.fromEntity(mc.player), packet.change(), packet.relatives()).position();
+            target = dev.jjstools.compat.Compat.teleportTarget(mc.player, packet);
         } catch (Throwable t) {
             target = packet.change().position();
         }

@@ -52,14 +52,14 @@ public final class EncounterTracker {
         if (mc.world == null || mc.player == null) return;
 
         Set<String> nowPresent = new HashSet<>();
-        String me = mc.player.getGameProfile().name();
+        String me = dev.jjstools.compat.Compat.name(mc.player.getGameProfile());
 
         for (PlayerEntity player : mc.world.getPlayers()) {
             if (player == mc.player) continue;
             // Identity alone is not enough: some mods spawn a copy of you, so check the profile too.
             if (player.getUuid().equals(mc.player.getUuid())) continue;
 
-            String name = player.getGameProfile().name();
+            String name = dev.jjstools.compat.Compat.name(player.getGameProfile());
             if (name == null || name.isBlank()) continue;
             if (name.equalsIgnoreCase(me)) continue;
             if (ControlPanel.encountersSkipFriends() && Friends.get().isFriend(player)) continue;

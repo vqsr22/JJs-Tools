@@ -8,8 +8,12 @@ import dev.jjstools.panel.TextBox;
 import dev.jjstools.panel.Ui;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.PlayerSkinDrawer;
+//#if MC >= 1.21.9
 import net.minecraft.component.type.ProfileComponent;
-import net.minecraft.client.texture.PlayerSkinCache;
+import net.minecraft.entity.player.SkinTextures;
+//#else
+//$$ import net.minecraft.client.util.SkinTextures;
+//#endif
 import net.minecraft.item.Items;
 
 import java.net.URI;
@@ -37,7 +41,7 @@ public class LookupPanel extends Panel {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("d MMMM yyyy h:mm a", Locale.ENGLISH);
 
     /** One player's stats, as 2b2t.vc gave them. */
-    private record Stats(String name, Supplier<PlayerSkinCache.Entry> skin, OffsetDateTime firstSeen, OffsetDateTime lastSeen,
+    private record Stats(String name, Supplier<SkinTextures> skin, OffsetDateTime firstSeen, OffsetDateTime lastSeen,
                          long playtime, long playtimeMonth, int kills, int deaths, int joins, int chats, boolean prio) {}
 
     // Kept for as long as the game runs, not just while the panel is open: the Control Panel
@@ -92,7 +96,19 @@ public class LookupPanel extends Panel {
     private static Stats parse(String name, JsonObject o) {
         // The game's own skin cache fetches the skin for the name, and the face shows it once it
         // has; until then it is the default skin.
-        Supplier<PlayerSkinCache.Entry> skin = MinecraftClient.getInstance().getPlayerSkinCache().getSupplier(ProfileComponent.ofDynamic(name));
+        //#if MC >= 1.21.9
+        var entry = MinecraftClient.getInstance().getPlayerSkinCache().getSupplier(ProfileComponent.ofDynamic(name));
+        Supplier<SkinTextures> skin = () -> entry.get().getTextures();
+        //#else
+        //$$ // Older versions have no cache by name: look the profile up, then fetch its skin.
+        //$$ var fetched = new java.util.concurrent.atomic.AtomicReference<SkinTextures>();
+        //$$ net.minecraft.block.entity.SkullBlockEntity.fetchProfileByName(name).thenAccept(profile -> profile.ifPresent(p ->
+        //$$     MinecraftClient.getInstance().getSkinProvider().fetchSkinTextures(p).thenAccept(t -> t.ifPresent(fetched::set))));
+        //$$ Supplier<SkinTextures> skin = () -> {
+        //$$     SkinTextures t = fetched.get();
+        //$$     return t != null ? t : net.minecraft.client.util.DefaultSkinHelper.getSteve();
+        //$$ };
+        //#endif
         return new Stats(name, skin, date(o, "firstSeen"), date(o, "lastSeen"),
             num(o, "playtimeSeconds"), num(o, "playtimeSecondsMonth"),
             (int) num(o, "killCount"), (int) num(o, "deathCount"), (int) num(o, "joinCount"), (int) num(o, "chatsCount"),
@@ -158,7 +174,7 @@ public class LookupPanel extends Panel {
 
         // Laid out in three columns like the bot's card, with their face in the top right.
         int head = Math.min(40, Math.max(24, w / 6));
-        PlayerSkinDrawer.draw(ui.ctx, s.skin().get().getTextures(), x + w - head, y, head);
+        PlayerSkinDrawer.draw(ui.ctx, s.skin().get(), x + w - head, y, head);
         ui.added(2);
         int col = (w - 4) / 3;
         int line = ui.lineH() + 2;

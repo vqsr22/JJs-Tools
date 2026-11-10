@@ -146,7 +146,7 @@ public class LogDetails {
             if (player == mc.player) continue;
 
             if (!sb.isEmpty()) sb.append(", ");
-            sb.append(player.getGameProfile().name())
+            sb.append(dev.jjstools.compat.Compat.name(player.getGameProfile()))
                 .append(" (").append(Math.round(mc.player.distanceTo(player))).append("m)");
         }
 
@@ -183,7 +183,7 @@ public class LogDetails {
         Entity attacker = source.getAttacker();
 
         if (attacker instanceof PlayerEntity player) {
-            return type + " from " + player.getGameProfile().name();
+            return type + " from " + dev.jjstools.compat.Compat.name(player.getGameProfile());
         }
         if (attacker != null) {
             return type + " from " + attacker.getType().getName().getString();

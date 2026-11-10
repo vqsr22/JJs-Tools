@@ -17,7 +17,9 @@ import meteordevelopment.meteorclient.gui.widgets.WWidget;
 import meteordevelopment.meteorclient.gui.widgets.containers.WContainer;
 import meteordevelopment.meteorclient.gui.widgets.containers.WWindow;
 import dev.jjstools.panel.Prefs;
+//#if MC >= 1.21.9
 import net.minecraft.client.gui.Click;
+//#endif
 
 public class WJJWindow extends WWindow implements JJWidget {
     public WJJWindow(WWidget icon, String title) {
@@ -162,19 +164,52 @@ public class WJJWindow extends WWindow implements JJWidget {
      * The edge is looked at before anything inside the window gets the click, so a module
      * sitting at the bottom of a long list does not take it, whatever it is scrolled to.
      */
+    //#if MC >= 1.21.9
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
-        if (click.button() == 0 && onGrip(click.x(), click.y())) return gripClicked(click, doubled);
+        if (click.button() == 0 && onGrip(click.x(), click.y())) return gripClicked(dev.jjstools.compat.Mouse.of(click), doubled);
         return super.mouseClicked(click, doubled);
     }
 
     @Override
     public boolean mouseReleased(Click click) {
-        if (resizing) return onMouseReleased(click);
+        if (resizing) return released();
         return super.mouseReleased(click);
     }
 
-    private boolean gripClicked(Click click, boolean doubled) {
+    @Override
+    public boolean onMouseReleased(Click click) {
+        return released();
+    }
+    //#else
+    //$$ private long gripClickedAt;
+    //$$
+    //$$ @Override
+    //$$ public boolean mouseClicked(double mouseX, double mouseY, int button, boolean used) {
+    //$$     if (button == 0 && onGrip(mouseX, mouseY)) {
+    //$$         // Older versions do not say whether a click is a double click: two on the grip
+    //$$         // within a quarter of a second count as one.
+    //$$         long now = net.minecraft.util.Util.getMeasuringTimeMs();
+    //$$         boolean doubled = now - gripClickedAt < 250;
+    //$$         gripClickedAt = now;
+    //$$         return gripClicked(new dev.jjstools.compat.Mouse(mouseX, mouseY, button), doubled);
+    //$$     }
+    //$$     return super.mouseClicked(mouseX, mouseY, button, used);
+    //$$ }
+    //$$
+    //$$ @Override
+    //$$ public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    //$$     if (resizing) return released();
+    //$$     return super.mouseReleased(mouseX, mouseY, button);
+    //$$ }
+    //$$
+    //$$ @Override
+    //$$ public boolean onMouseReleased(double mouseX, double mouseY, int button) {
+    //$$     return released();
+    //$$ }
+    //#endif
+
+    private boolean gripClicked(dev.jjstools.compat.Mouse click, boolean doubled) {
         if (doubled) {
             Prefs.get().meteorWindowHeights.remove(id);
             Prefs.save();
@@ -231,8 +266,7 @@ public class WJJWindow extends WWindow implements JJWidget {
         invalidate();
     }
 
-    @Override
-    public boolean onMouseReleased(Click click) {
+    private boolean released() {
         if (!resizing) return false;
         resizing = false;
         resizingAny = false;

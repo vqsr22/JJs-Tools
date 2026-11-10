@@ -12,7 +12,9 @@ import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gl.RenderPipelines;
+//#if MC >= 1.21.9
 import net.minecraft.client.gui.Click;
+//#endif
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
@@ -349,8 +351,7 @@ public class ModuleWheel extends Module {
          * moving round to make room, and stays where it is let go. The middle circle leaves it
          * where it started.
          */
-        @Override
-        public boolean mouseClicked(Click click, boolean doubled) {
+        private boolean clicked(dev.jjstools.compat.Mouse click) {
             if (done) return true;
             if (click.button() == 1) {
                 int at = hovered(click.x(), click.y());
@@ -361,11 +362,10 @@ public class ModuleWheel extends Module {
                 choose(hovered(click.x(), click.y()));
                 return true;
             }
-            return super.mouseClicked(click, doubled);
+            return false;
         }
 
-        @Override
-        public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+        private boolean dragged(dev.jjstools.compat.Mouse click) {
             if (dragging != null) {
                 int to = hovered(click.x(), click.y());
                 int from = list.indexOf(dragging);
@@ -375,11 +375,10 @@ public class ModuleWheel extends Module {
                 }
                 return true;
             }
-            return super.mouseDragged(click, offsetX, offsetY);
+            return false;
         }
 
-        @Override
-        public boolean mouseReleased(Click click) {
+        private boolean released(dev.jjstools.compat.Mouse click) {
             if (click.button() == 1 && dragging != null) {
                 dragging = null;
                 // Kept for next time, and saved with the module.
@@ -387,8 +386,40 @@ public class ModuleWheel extends Module {
                 for (Slot slot : list) order.add(slot.key());
                 return true;
             }
-            return super.mouseReleased(click);
+            return false;
         }
+
+        //#if MC >= 1.21.9
+        @Override
+        public boolean mouseClicked(Click click, boolean doubled) {
+            return clicked(dev.jjstools.compat.Mouse.of(click)) || super.mouseClicked(click, doubled);
+        }
+
+        @Override
+        public boolean mouseDragged(Click click, double offsetX, double offsetY) {
+            return dragged(dev.jjstools.compat.Mouse.of(click)) || super.mouseDragged(click, offsetX, offsetY);
+        }
+
+        @Override
+        public boolean mouseReleased(Click click) {
+            return released(dev.jjstools.compat.Mouse.of(click)) || super.mouseReleased(click);
+        }
+        //#else
+        //$$ @Override
+        //$$ public boolean mouseClicked(double x, double y, int button) {
+        //$$     return clicked(new dev.jjstools.compat.Mouse(x, y, button)) || super.mouseClicked(x, y, button);
+        //$$ }
+        //$$
+        //$$ @Override
+        //$$ public boolean mouseDragged(double x, double y, int button, double offsetX, double offsetY) {
+        //$$     return dragged(new dev.jjstools.compat.Mouse(x, y, button)) || super.mouseDragged(x, y, button, offsetX, offsetY);
+        //$$ }
+        //$$
+        //$$ @Override
+        //$$ public boolean mouseReleased(double x, double y, int button) {
+        //$$     return released(new dev.jjstools.compat.Mouse(x, y, button)) || super.mouseReleased(x, y, button);
+        //$$ }
+        //#endif
 
         private int hoveredNow() {
             MinecraftClient c = MinecraftClient.getInstance();

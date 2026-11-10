@@ -13,7 +13,9 @@ import net.minecraft.block.BarrelBlock;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.ChestBlock;
+//#if MC >= 1.21.9
 import net.minecraft.block.CopperChestBlock;
+//#endif
 import net.minecraft.block.EnderChestBlock;
 import net.minecraft.block.ShulkerBoxBlock;
 import net.minecraft.block.enums.ChestType;
@@ -226,7 +228,11 @@ public final class StorageMemory {
         if (block instanceof BarrelBlock) return Kind.Barrel;
 
         // Copper chests are chests underneath too, but are left out on purpose.
+        //#if MC >= 1.21.9
         if (block instanceof ChestBlock && !(block instanceof CopperChestBlock)) return Kind.Chest;
+        //#else
+        //$$ if (block instanceof ChestBlock) return Kind.Chest;
+        //#endif
         return null;
     }
 

@@ -4,7 +4,11 @@ import dev.jjstools.JJsTools;
 import meteordevelopment.meteorclient.events.entity.player.InteractBlockEvent;
 import meteordevelopment.meteorclient.events.entity.player.InteractItemEvent;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
+//#if MC >= 1.21.9
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
+//#else
+//$$ import meteordevelopment.meteorclient.events.meteor.MouseButtonEvent;
+//#endif
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.DoubleSetting;
@@ -295,9 +299,13 @@ public class ElytraTakeoff extends Module {
 
     /** Stops the middle click from also doing pick block, when asked to. */
     @EventHandler
+    //#if MC >= 1.21.9
     private void onMouse(MouseClickEvent event) {
+    //#else
+    //$$ private void onMouse(MouseButtonEvent event) {
+    //#endif
         if (!cancelPickBlock.get() || mc.currentScreen != null) return;
-        if (event.action == KeyAction.Press && takeoffKey.get().matches(event.input) && isMiddleMouse(takeoffKey.get())) {
+        if (event.action == KeyAction.Press && dev.jjstools.compat.Compat.matches(takeoffKey.get(), event) && isMiddleMouse(takeoffKey.get())) {
             event.cancel();
         }
     }

@@ -52,6 +52,7 @@
 		"RecipeDisplayEntryMixin",
 		"RecipeResultCollectionMixin",
 		"ShulkerBoxScreenMixin",
+		"SignBlockEntityAccessor",
 		"SignOutlineMixin",
 		"StonecutterScreenHandlerMixin",
 		"TrimMaterialPropertyMixin",

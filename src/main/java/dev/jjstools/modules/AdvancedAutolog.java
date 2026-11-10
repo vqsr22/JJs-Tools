@@ -21,7 +21,6 @@ import net.minecraft.util.math.BlockPos;
 import dev.jjstools.util.JJConfig;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.world.World;
-import net.minecraft.entity.EntityPosition;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.network.packet.c2s.play.PlayerInteractItemC2SPacket;
 import net.minecraft.network.packet.s2c.play.PlayerPositionLookS2CPacket;
@@ -1158,7 +1157,7 @@ public class AdvancedAutolog extends Module {
             PlayerEntity near = nearbyPlayer();
             if (near != null) {
                 Text reason = Text.literal("§8[§cAdvanced Autolog§8] §fDisconnected you because §c"
-                    + near.getGameProfile().name() + "§f came within §c"
+                    + dev.jjstools.compat.Compat.name(near.getGameProfile()) + "§f came within §c"
                     + Math.round(mc.player.distanceTo(near)) + "§f blocks§c!");
                 requestLogout(reason, forceKick.get());
             }
@@ -1264,11 +1263,11 @@ public class AdvancedAutolog extends Module {
         // which it has not during a queue or on the first frames after joining.
         if (pullDimension == null) return;
 
-        Vec3d current = mc.player.getEntityPos();
+        Vec3d current = dev.jjstools.compat.Compat.pos(mc.player);
 
         Vec3d target;
         try {
-            target = EntityPosition.apply(EntityPosition.fromEntity(mc.player), packet.change(), packet.relatives()).position();
+            target = dev.jjstools.compat.Compat.teleportTarget(mc.player, packet);
         } catch (Throwable t) {
             target = packet.change().position();
         }

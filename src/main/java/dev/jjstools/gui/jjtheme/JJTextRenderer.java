@@ -45,7 +45,7 @@ public final class JJTextRenderer implements TextRenderer {
 
     private JJTextRenderer(FontFace face) throws Exception {
         this.face = face;
-        this.buffer = face.readToDirectByteBuffer();
+        this.buffer = dev.jjstools.compat.Compat.fontBytes(face);
         this.measure = new Font(buffer, 27);
     }
 
@@ -158,7 +158,13 @@ public final class JJTextRenderer implements TextRenderer {
                 .attachments(MinecraftClient.getInstance().getFramebuffer())
                 .pipeline(MeteorRenderPipelines.UI_TEXT)
                 .mesh(mesh)
+                //#if MC >= 1.21.9
                 .sampler("u_Texture", font.texture.getGlTextureView(), font.texture.getSampler())
+                //#elif MC >= 1.21.6
+                //$$ .sampler("u_Texture", font.texture.getGlTextureView())
+                //#else
+                //$$ .setupCallback(pass -> pass.bindSampler("u_Texture", font.texture.getGlTexture()))
+                //#endif
                 .end();
         }
         building = false;

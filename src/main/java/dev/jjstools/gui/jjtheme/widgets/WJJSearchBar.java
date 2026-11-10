@@ -60,11 +60,18 @@ public class WJJSearchBar extends WVerticalList implements JJWidget {
         // The ten best: modules by name first, then modules with a setting by that name.
         int limit = 10;
         Map<Module, String> found = new LinkedHashMap<>();
+        //#if MC >= 1.21.9
         List<Pair<Module, String>> titles = Modules.get().searchTitles(text);
         for (Pair<Module, String> p : titles) {
             if (found.size() >= limit) break;
             found.putIfAbsent(p.getLeft(), p.getRight());
         }
+        //#else
+        //$$ for (Module m : Modules.get().searchTitles(text)) {
+        //$$     if (found.size() >= limit) break;
+        //$$     found.putIfAbsent(m, m.title);
+        //$$ }
+        //#endif
         for (Module m : Modules.get().searchSettingTitles(text)) {
             if (found.size() >= limit) break;
             found.putIfAbsent(m, m.title);
@@ -72,7 +79,7 @@ public class WJJSearchBar extends WVerticalList implements JJWidget {
 
         int col = 0;
         for (Map.Entry<Module, String> e : found.entrySet()) {
-            results.add(theme.module(e.getKey(), e.getValue())).expandX();
+            results.add(((dev.jjstools.gui.jjtheme.JJGuiTheme) theme).module(e.getKey(), e.getValue())).expandX();
             if (++col == COLUMNS) {
                 results.row();
                 col = 0;

@@ -38,7 +38,11 @@ public final class ScreenOverlay {
             var state = access.jjstools$getGuiState();
             state.clear();
             int mx = (int) mc.mouse.getScaledX(mc.getWindow()), my = (int) mc.mouse.getScaledY(mc.getWindow());
+            //#if MC >= 1.21.9
             var context = new net.minecraft.client.gui.DrawContext(mc, state, mx, my);
+            //#else
+            //$$ var context = new net.minecraft.client.gui.DrawContext(mc, state);
+            //#endif
             tweaks.drawPreview(context, context.getScaledWindowWidth());
             com.mojang.blaze3d.systems.RenderSystem.getDevice().createCommandEncoder()
                 .clearDepthTexture(mc.getFramebuffer().getDepthAttachment(), 1.0);

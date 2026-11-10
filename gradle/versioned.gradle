@@ -1,0 +1,132 @@
+// Version blocks: one source tree for every supported Minecraft version.
+//
+// Code that differs between versions sits in blocks like this, in .java and .json files:
+//
+//     //#if MC >= 1.21.9
+//     ...code for 1.21.9 and newer...
+//     //#elif MC >= 1.21.5
+//     //$$ ...code for 1.21.5 up to 1.21.8...
+//     //#else
+//     //$$ ...code for older versions...
+//     //#endif
+//
+// Conditions compare MC with ==, !=, <, <=, > or >= and can be joined with &&.
+// Blocks can be nested. Before compiling, src/main is copied to build/versioned/<version> with
+// the lines of the blocks that do not apply blanked out, so line numbers in errors still match
+// the real files, and "//$$ " taken off the start of the lines that do apply. Everything outside
+// a block is shared by every version.
+//
+// Write the branch for the newest version as plain code and the others behind "//$$ ", so
+// src/main reads as plain 1.21.11 code and an IDE pointed at it works as normal.
+
+def mcVersion = project.minecraft_version
+
+static int compareVersions(String a, String b) {
+	def x = a.tokenize('.').collect { it as int }
+	def y = b.tokenize('.').collect { it as int }
+	for (int i = 0; i < Math.max(x.size(), y.size()); i++) {
+		int p = i < x.size() ? x[i] : 0
+		int q = i < y.size() ? y[i] : 0
+		if (p != q) return p <=> q
+	}
+	return 0
+}
+
+static boolean versionCondition(String cond, String mc, String where) {
+	return cond.split('&&').every { part ->
+		def m = part.trim() =~ /^MC\s*(==|!=|<=|>=|<|>)\s*([0-9.]+)$/
+		if (!m.matches()) throw new GradleException("${where}: cannot read version condition '${part.trim()}'")
+		int c = compareVersions(mc, m.group(2))
+		switch (m.group(1)) {
+			case '==': return c == 0
+			case '!=': return c != 0
+			case '<': return c < 0
+			case '<=': return c <= 0
+			case '>': return c > 0
+			default: return c >= 0
+		}
+	}
+}
+
+static String versionedText(String text, String mc, String where) {
+	// One frame per open block: [any branch taken yet, this branch active, parent active]
+	def stack = []
+	boolean active = true
+	def out = new StringBuilder()
+	int n = 0
+	text.eachLine { line ->
+		n++
+		def t = line.trim()
+		def at = "${where}:${n}"
+		if (t.startsWith('//#if ')) {
+			boolean on = active && versionCondition(t.substring(6), mc, at)
+			stack.push([on, on, active])
+			active = on
+			out.append('\n')
+		} else if (t.startsWith('//#elif ')) {
+			if (stack.isEmpty()) throw new GradleException("${at}: //#elif without //#if")
+			def f = stack.pop()
+			boolean on = f[2] && !f[0] && versionCondition(t.substring(8), mc, at)
+			stack.push([f[0] || on, on, f[2]])
+			active = on
+			out.append('\n')
+		} else if (t == '//#else') {
+			if (stack.isEmpty()) throw new GradleException("${at}: //#else without //#if")
+			def f = stack.pop()
+			boolean on = f[2] && !f[0]
+			stack.push([true, on, f[2]])
+			active = on
+			out.append('\n')
+		} else if (t == '//#endif') {
+			if (stack.isEmpty()) throw new GradleException("${at}: //#endif without //#if")
+			def f = stack.pop()
+			active = f[2]
+			out.append('\n')
+		} else {
+			if (!active) {
+				out.append('\n')
+			} else {
+				// "//$$ " marks a line written for an older version: uncomment it.
+				def m = line =~ /^(\s*)\/\/\$\$ ?(.*)$/
+				out.append(m.matches() ? m.group(1) + m.group(2) : line).append('\n')
+			}
+		}
+	}
+	if (!stack.isEmpty()) throw new GradleException("${where}: //#if without //#endif")
+	return out.toString()
+}
+
+def versionedDir = layout.buildDirectory.dir("versioned/${mcVersion}")
+
+def versionedSources = tasks.register('versionedSources') {
+	description = "Writes the sources for Minecraft ${mcVersion}, keeping only the version blocks that apply."
+	inputs.dir('src/main')
+	inputs.property('minecraft_version', mcVersion)
+	outputs.dir(versionedDir)
+	doLast {
+		def root = file('src/main')
+		def out = versionedDir.get().asFile
+		project.delete(out)
+		root.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+			def rel = root.toPath().relativize(f.toPath()).toString()
+			def target = new File(out, rel)
+			target.parentFile.mkdirs()
+			if (f.name.endsWith('.java') || f.name.endsWith('.json')) {
+				target.setText(versionedText(f.getText('UTF-8'), mcVersion, rel), 'UTF-8')
+			} else {
+				java.nio.file.Files.copy(f.toPath(), target.toPath())
+			}
+		}
+	}
+}
+
+sourceSets {
+	main {
+		java.srcDirs = [versionedDir.map { it.dir('java') }]
+		resources.srcDirs = [versionedDir.map { it.dir('resources') }]
+	}
+}
+
+tasks.named('compileJava') { dependsOn versionedSources }
+tasks.named('processResources') { dependsOn versionedSources }
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn versionedSources }

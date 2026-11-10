@@ -3,7 +3,11 @@ package dev.jjstools.modules;
 import dev.jjstools.JJsTools;
 import dev.jjstools.util.KitStore;
 import dev.jjstools.util.MsgUtil;
+//#if MC >= 1.21.9
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
+//#else
+//$$ import meteordevelopment.meteorclient.events.meteor.MouseButtonEvent;
+//#endif
 import meteordevelopment.meteorclient.events.world.TickEvent;
 import meteordevelopment.meteorclient.settings.BoolSetting;
 import meteordevelopment.meteorclient.settings.EnumSetting;
@@ -285,8 +289,12 @@ public class KitCreator extends Module {
      * this event never arrives nothing is lost.
      */
     @EventHandler
+    //#if MC >= 1.21.9
     private void onMouseClick(MouseClickEvent event) {
-        if (!drawn || event.action != KeyAction.Press || !LEFT_CLICK.matches(event.input)) return;
+    //#else
+    //$$ private void onMouseClick(MouseButtonEvent event) {
+    //#endif
+        if (!drawn || event.action != KeyAction.Press || !dev.jjstools.compat.Compat.matches(LEFT_CLICK, event)) return;
         if (!(mc.currentScreen instanceof ShulkerBoxScreen)) return;
 
         if (inside(scanX, scanY) || inside(createX, createY)) event.cancel();

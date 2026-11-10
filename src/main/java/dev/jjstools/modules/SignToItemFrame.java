@@ -21,9 +21,15 @@ import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.TexturedRenderLayers;
 import net.minecraft.client.render.model.BlockStateManagers;
 import net.minecraft.client.render.model.BlockStateModel;
+//#if MC >= 1.21.9
 import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
 import net.minecraft.client.render.block.entity.state.SignBlockEntityRenderState;
 import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+//#else
+//$$ import net.minecraft.block.entity.BlockEntity;
+//$$ import net.minecraft.client.render.VertexConsumerProvider;
+//$$ import net.minecraft.client.render.WorldRenderer;
+//#endif
 import net.minecraft.client.render.item.ItemRenderState;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.DataComponentTypes;
@@ -238,7 +244,11 @@ public class SignToItemFrame extends Module {
      *
      * Rendering is one thread, so one slot is enough.
      */
+    //#if MC >= 1.21.9
     private static SignBlockEntityRenderState swapped;
+    //#else
+    //$$ private static SignBlockEntity swapped;
+    //#endif
     private static SignText swappedFront;
     private static SignText swappedBack;
 
@@ -592,6 +602,10 @@ public class SignToItemFrame extends Module {
      * text space and had to divide its magnification back out; this is plainer and the numbers
      * in the settings mean what they say.
      */
+    //#if MC >= 1.21.9
+    /** Where the item and frame are sent to be drawn: the render queue from 1.21.9, a vertex consumer provider before. */
+    private record Out(OrderedRenderCommandQueue queue) {}
+
     public static boolean onBlockEntity(BlockEntityRenderState state, MatrixStack matrices,
                                         OrderedRenderCommandQueue queue) {
         if (!on() || state == null || state.pos == null || state.blockState == null) return false;
@@ -599,10 +613,6 @@ public class SignToItemFrame extends Module {
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.world == null) return false;
-        if (renderThread == null) renderThread = Thread.currentThread();
-
-        SignToItemFrame module = get();
-        if (module == null) return false;
 
         // The writing is already in the render state, so the sign is not looked up in the world.
         SignText frontText, backText;
@@ -616,11 +626,91 @@ public class SignToItemFrame extends Module {
             return false;
         }
 
+        Shown shown = draw(state.blockState, frontText, backText, state.lightmapCoordinates, matrices, new Out(queue));
+        if (shown == null) return false;
+        if (shown.hide()) return true;
+
+        if (shown.blank() && state instanceof SignBlockEntityRenderState sign2) {
+            swapped = sign2;
+            swappedFront = sign2.frontText;
+            swappedBack = sign2.backText;
+
+            // Only the side showing an item loses its writing. A label on the back of a sign
+            // whose front is an item is still a label.
+            if (shown.front()) sign2.frontText = BLANK;
+            if (shown.back()) sign2.backText = BLANK;
+        }
+
+        return false;
+    }
+
+    /** Puts the writing back, once vanilla has drawn the sign without it. */
+    public static void afterBlockEntity(BlockEntityRenderState state) {
+        if (swapped == null || swapped != state) return;
+
+        swapped.frontText = swappedFront;
+        swapped.backText = swappedBack;
+
+        swapped = null;
+        swappedFront = null;
+        swappedBack = null;
+    }
+    //#else
+    //$$ /** Where the item and frame are sent to be drawn: the render queue from 1.21.9, a vertex consumer provider before. */
+    //$$ private record Out(VertexConsumerProvider vertices) {}
+    //$$
+    //$$ /** As above, for versions before render states: the sign itself is drawn, so its own writing is swapped. */
+    //$$ public static boolean onBlockEntity(BlockEntity blockEntity, MatrixStack matrices, VertexConsumerProvider vertices) {
+    //$$     if (!on() || !(blockEntity instanceof SignBlockEntity sign) || sign.getWorld() == null) return false;
+    //$$     BlockState blockState = sign.getCachedState();
+    //$$     if (!(blockState.getBlock() instanceof AbstractSignBlock)) return false;
+    //$$
+    //$$     int light = WorldRenderer.getLightmapCoordinates(sign.getWorld(), sign.getPos());
+    //$$     Shown shown = draw(blockState, sign.getText(true), sign.getText(false), light, matrices, new Out(vertices));
+    //$$     if (shown == null) return false;
+    //$$     if (shown.hide()) return true;
+    //$$
+    //$$     if (shown.blank()) {
+    //$$         var access = (dev.jjstools.mixin.SignBlockEntityAccessor) sign;
+    //$$         swapped = sign;
+    //$$         swappedFront = access.jjstools$getFrontText();
+    //$$         swappedBack = access.jjstools$getBackText();
+    //$$         if (shown.front()) access.jjstools$setFrontText(BLANK);
+    //$$         if (shown.back()) access.jjstools$setBackText(BLANK);
+    //$$     }
+    //$$     return false;
+    //$$ }
+    //$$
+    //$$ /** Puts the writing back, once vanilla has drawn the sign without it. */
+    //$$ public static void afterBlockEntity(BlockEntity blockEntity) {
+    //$$     if (swapped == null || swapped != blockEntity) return;
+    //$$
+    //$$     var access = (dev.jjstools.mixin.SignBlockEntityAccessor) swapped;
+    //$$     access.jjstools$setFrontText(swappedFront);
+    //$$     access.jjstools$setBackText(swappedBack);
+    //$$
+    //$$     swapped = null;
+    //$$     swappedFront = null;
+    //$$     swappedBack = null;
+    //$$ }
+    //#endif
+
+    /** What was drawn on a sign: which sides show an item, and what to do with the sign itself. */
+    private record Shown(boolean front, boolean back, boolean hide, boolean blank) {}
+
+    /** Draws the item on whichever sides name one; null when neither does. */
+    private static Shown draw(BlockState blockState, SignText frontText, SignText backText, int light,
+                              MatrixStack matrices, Out sink) {
+        if (renderThread == null) renderThread = Thread.currentThread();
+
+        SignToItemFrame module = get();
+        if (module == null) return null;
+
         ItemStack front = fromText(frontText);
         ItemStack back = module.bothSides.get() ? fromText(backText) : null;
-        if (front == null && back == null) return false;
+        if (front == null && back == null) return null;
 
-        float yaw = faceYaw(state.blockState);
+        float yaw = faceYaw(blockState);
 
         /*
          * Where the board actually is, taken from the numbers vanilla's own sign renderer uses
@@ -636,7 +726,7 @@ public class SignToItemFrame extends Module {
          * everything: a wall sign was being pushed forward half a block when it should have
          * been pulled back nearly half a block.
          */
-        var block = state.blockState.getBlock();
+        var block = blockState.getBlock();
         boolean wall = block instanceof WallSignBlock;
         boolean hanging = block instanceof WallHangingSignBlock || block instanceof HangingSignBlock;
 
@@ -670,24 +760,12 @@ public class SignToItemFrame extends Module {
          */
         double itemDepth = (framed ? frameBack + 0.044 : board + out) + module.lift.get();
 
-        if (front != null) face(module, matrices, queue, state, yaw, centre, itemDepth, frameBack, front);
-        if (back != null) face(module, matrices, queue, state, yaw + 180.0F, centre,
+        if (front != null) face(module, matrices, sink, light, yaw, centre, itemDepth, frameBack, front);
+        if (back != null) face(module, matrices, sink, light, yaw + 180.0F, centre,
             framed ? itemDepth : -board + out + module.lift.get(), -frameBack, back);
 
-        if (module.signVisible.get() == Sign.Hidden) return true;
-
-        if (module.signVisible.get() == Sign.Blank && state instanceof SignBlockEntityRenderState sign2) {
-            swapped = sign2;
-            swappedFront = sign2.frontText;
-            swappedBack = sign2.backText;
-
-            // Only the side showing an item loses its writing. A label on the back of a sign
-            // whose front is an item is still a label.
-            if (front != null) sign2.frontText = BLANK;
-            if (back != null) sign2.backText = BLANK;
-        }
-
-        return false;
+        return new Shown(front != null, back != null, module.signVisible.get() == Sign.Hidden,
+            module.signVisible.get() == Sign.Blank);
     }
 
     /**
@@ -723,18 +801,6 @@ public class SignToItemFrame extends Module {
     private static void rebuild() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc != null && mc.world != null && mc.worldRenderer != null) mc.worldRenderer.reload();
-    }
-
-    /** Puts the writing back, once vanilla has drawn the sign without it. */
-    public static void afterBlockEntity(BlockEntityRenderState state) {
-        if (swapped == null || swapped != state) return;
-
-        swapped.frontText = swappedFront;
-        swapped.backText = swappedBack;
-
-        swapped = null;
-        swappedFront = null;
-        swappedBack = null;
     }
 
     /** The compass direction the writing faces, in degrees. */
@@ -786,11 +852,10 @@ public class SignToItemFrame extends Module {
     }
 
     /** One side of one sign: out to the middle of the block, turned to match it, then out to the board. */
-    private static void face(SignToItemFrame module, MatrixStack matrices, OrderedRenderCommandQueue queue,
-                             BlockEntityRenderState state, float yaw, double centre, double depth,
+    private static void face(SignToItemFrame module, MatrixStack matrices, Out queue,
+                             int light, float yaw, double centre, double depth,
                              double frameBack, ItemStack stack) {
         MinecraftClient mc = MinecraftClient.getInstance();
-        int light = state.lightmapCoordinates;
 
         /*
          * No camera in this: the matrices arrive already standing at the block.
@@ -835,7 +900,7 @@ public class SignToItemFrame extends Module {
      * because that is read off the model's own geometry rather than measured in game.
      */
     private static void frame(SignToItemFrame module, MinecraftClient mc, MatrixStack matrices,
-                              OrderedRenderCommandQueue queue, Frame style, int light) {
+                              Out queue, Frame style, int light) {
         BlockStateModel model = mc.getBlockRenderManager()
             .getModel(frameState(style == Frame.Glow));
         if (model == null) return;
@@ -858,12 +923,18 @@ public class SignToItemFrame extends Module {
          */
         matrices.translate(-0.5, -0.5, -1.0);
 
-        queue.getBatchingQueue(0).submitBlockStateModel(matrices, TexturedRenderLayers.getEntitySolid(),
+        //#if MC >= 1.21.9
+        queue.queue().getBatchingQueue(0).submitBlockStateModel(matrices, TexturedRenderLayers.getEntitySolid(),
             model, 1.0F, 1.0F, 1.0F, frameLight, OverlayTexture.DEFAULT_UV, 0);
+        //#else
+        //$$ net.minecraft.client.render.block.BlockModelRenderer.render(matrices.peek(),
+        //$$     queue.vertices().getBuffer(TexturedRenderLayers.getEntitySolid()), model, 1.0F, 1.0F, 1.0F,
+        //$$     frameLight, OverlayTexture.DEFAULT_UV);
+        //#endif
         matrices.pop();
     }
 
-    private static void render(MinecraftClient mc, MatrixStack matrices, OrderedRenderCommandQueue queue,
+    private static void render(MinecraftClient mc, MatrixStack matrices, Out queue,
                                int light, ItemStack stack, float size) {
         ItemRenderState render = STATES.get(stack);
         if (render == null) {
@@ -886,7 +957,11 @@ public class SignToItemFrame extends Module {
         matrices.push();
         turnY(matrices, 180.0F);
         matrices.scale(size, size, size);
-        render.render(matrices, queue, light, OverlayTexture.DEFAULT_UV, 0);
+        //#if MC >= 1.21.9
+        render.render(matrices, queue.queue(), light, OverlayTexture.DEFAULT_UV, 0);
+        //#else
+        //$$ render.render(matrices, queue.vertices(), light, OverlayTexture.DEFAULT_UV);
+        //#endif
         matrices.pop();
     }
 

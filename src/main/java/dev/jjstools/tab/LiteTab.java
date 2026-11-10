@@ -10,7 +10,11 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.PlayerSkinDrawer;
 import net.minecraft.client.gui.hud.PlayerListHud;
 import net.minecraft.client.network.PlayerListEntry;
+//#if MC >= 1.21.9
 import net.minecraft.entity.player.SkinTextures;
+//#else
+//$$ import net.minecraft.client.util.SkinTextures;
+//#endif
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;

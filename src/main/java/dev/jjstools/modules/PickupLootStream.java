@@ -14,7 +14,6 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
-import net.minecraft.text.StyleSpriteSource;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -535,11 +534,11 @@ public class PickupLootStream extends Module {
 
     private Text styled(String text) {
         MutableText t = Text.literal(text);
-        StyleSpriteSource.Font source = fontSource();
-        return source == null ? t : t.setStyle(Style.EMPTY.withFont(source));
+        Identifier source = fontSource();
+        return source == null ? t : t.setStyle(dev.jjstools.compat.Compat.withFont(Style.EMPTY, source));
     }
 
-    private StyleSpriteSource.Font fontSource() {
+    private Identifier fontSource() {
         String id = switch (font.get()) {
             case Default -> null;
             case Uniform -> "minecraft:uniform";
@@ -550,7 +549,7 @@ public class PickupLootStream extends Module {
         if (id == null || id.isEmpty()) return null;
 
         Identifier parsed = Identifier.tryParse(id);
-        return parsed == null ? null : new StyleSpriteSource.Font(parsed);
+        return parsed;
     }
 
     private String formatCount(int n) {

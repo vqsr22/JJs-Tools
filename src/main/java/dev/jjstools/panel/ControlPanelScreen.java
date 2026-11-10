@@ -9,11 +9,15 @@ import dev.jjstools.panel.panels.EnderPanel;
 import dev.jjstools.panel.panels.PearlsPanel;
 import dev.jjstools.panel.panels.LookupPanel;
 import dev.jjstools.panel.panels.StatsPanel;
+//#if MC >= 1.21.9
 import net.minecraft.client.gui.Click;
+//#endif
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+//#if MC >= 1.21.9
 import net.minecraft.client.input.CharInput;
 import net.minecraft.client.input.KeyInput;
+//#endif
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
@@ -903,8 +907,58 @@ public class ControlPanelScreen extends Screen {
         });
     }
 
+    //#if MC >= 1.21.9
     @Override
     public boolean mouseClicked(Click click, boolean doubled) {
+        return clicked(dev.jjstools.compat.Mouse.of(click), doubled);
+    }
+
+    @Override
+    public boolean mouseReleased(Click click) {
+        return released(dev.jjstools.compat.Mouse.of(click));
+    }
+
+    @Override
+    public boolean keyPressed(KeyInput input) {
+        return pressed(input.key(), input.modifiers()) || super.keyPressed(input);
+    }
+
+    @Override
+    public boolean charTyped(CharInput input) {
+        return typed(input.asString()) || super.charTyped(input);
+    }
+    //#else
+    //$$ private long lastClickAt;
+    //$$ private int lastClickButton = -1;
+    //$$
+    //$$ @Override
+    //$$ public boolean mouseClicked(double x, double y, int button) {
+    //$$     // Older versions do not say whether a click is a double click: the same button twice
+    //$$     // within a quarter of a second, as newer ones count it.
+    //$$     long now = net.minecraft.util.Util.getMeasuringTimeMs();
+    //$$     boolean doubled = button == lastClickButton && now - lastClickAt < 250;
+    //$$     lastClickAt = now;
+    //$$     lastClickButton = button;
+    //$$     return clicked(new dev.jjstools.compat.Mouse(x, y, button), doubled);
+    //$$ }
+    //$$
+    //$$ @Override
+    //$$ public boolean mouseReleased(double x, double y, int button) {
+    //$$     return released(new dev.jjstools.compat.Mouse(x, y, button));
+    //$$ }
+    //$$
+    //$$ @Override
+    //$$ public boolean keyPressed(int key, int scanCode, int modifiers) {
+    //$$     return pressed(key, modifiers) || super.keyPressed(key, scanCode, modifiers);
+    //$$ }
+    //$$
+    //$$ @Override
+    //$$ public boolean charTyped(char chr, int modifiers) {
+    //$$     return typed(String.valueOf(chr)) || super.charTyped(chr, modifiers);
+    //$$ }
+    //#endif
+
+    private boolean clicked(dev.jjstools.compat.Mouse click, boolean doubled) {
         this.doubled = doubled;
         if (click.button() == 0) ui.down = true;
         TextBox before = ui.focus;
@@ -918,8 +972,7 @@ public class ControlPanelScreen extends Screen {
         return true;
     }
 
-    @Override
-    public boolean mouseReleased(Click click) {
+    private boolean released(dev.jjstools.compat.Mouse click) {
         if (click.button() == 0) ui.down = false;
         if (ui.drag != null) {
             ui.drag = null;
@@ -940,33 +993,33 @@ public class ControlPanelScreen extends Screen {
         return true;
     }
 
-    @Override
-    public boolean keyPressed(KeyInput input) {
+    /** A key going down; false hands it on to the screen's own handling. */
+    private boolean pressed(int key, int modifiers) {
         if (capturing != null) {
             // Escape clears the bind; any other key becomes it.
-            capturing.set(input.key() == GLFW.GLFW_KEY_ESCAPE ? Keybind.none() : Keybind.fromKeys(input.key(), input.modifiers()));
+            capturing.set(key == GLFW.GLFW_KEY_ESCAPE ? Keybind.none() : Keybind.fromKeys(key, modifiers));
             capturing = null;
             return true;
         }
         if (ui.focus != null) {
-            if (input.key() == GLFW.GLFW_KEY_ESCAPE) {
+            if (key == GLFW.GLFW_KEY_ESCAPE) {
                 ui.focus = null;
                 return true;
             }
-            if (ui.focus.key(input.key(), input.modifiers())) return true;
+            if (ui.focus.key(key, modifiers)) return true;
             // Letters and the like arrive as typed characters; keep them from doing anything else.
             return true;
         }
-        return super.keyPressed(input);
+        return false;
     }
 
-    @Override
-    public boolean charTyped(CharInput input) {
+    /** Typed text; false hands it on to the screen's own handling. */
+    private boolean typed(String text) {
         if (ui.focus != null) {
-            ui.focus.type(input.asString());
+            ui.focus.type(text);
             return true;
         }
-        return super.charTyped(input);
+        return false;
     }
 
     @Override

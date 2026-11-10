@@ -707,10 +707,21 @@ public class JJGuiTheme extends GuiTheme {
         return w(new WJJAccount(screen, account));
     }
 
+    //#if MC >= 1.21.9
     @Override
     public WWidget module(Module module, String title) {
         return w(new WJJModule(module, title));
     }
+    //#else
+    //$$ @Override
+    //$$ public WWidget module(Module module) {
+    //$$     return w(new WJJModule(module, module.title));
+    //$$ }
+    //$$
+    //$$ public WWidget module(Module module, String title) {
+    //$$     return w(new WJJModule(module, title));
+    //$$ }
+    //#endif
 
     @Override
     public WQuad quad(Color color) {

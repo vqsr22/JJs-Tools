@@ -292,7 +292,7 @@ public final class UiFont {
             if (chosen == null) return null;
             return new Source("meteor:" + System.identityHashCode(chosen), () -> {
                 try {
-                    return chosen.readToDirectByteBuffer();
+                    return dev.jjstools.compat.Compat.fontBytes(chosen);
                 } catch (Throwable t) {
                     return null;
                 }

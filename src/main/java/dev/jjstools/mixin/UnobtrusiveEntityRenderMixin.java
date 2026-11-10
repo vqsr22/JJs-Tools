@@ -2,7 +2,11 @@ package dev.jjstools.mixin;
 
 import dev.jjstools.modules.Unobtrusive;
 import net.minecraft.client.render.Frustum;
+//#if MC >= 1.21.9
 import net.minecraft.client.render.entity.EntityRenderManager;
+//#else
+//$$ import net.minecraft.client.render.entity.EntityRenderDispatcher;
+//#endif
 import net.minecraft.entity.Entity;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -16,7 +20,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * the camera position along with it, which is exactly what "too close to the camera" needs.
  * Answering no here means the item is simply not drawn that frame; nothing about it changes.
  */
+//#if MC >= 1.21.9
 @Mixin(EntityRenderManager.class)
+//#else
+//$$ @Mixin(EntityRenderDispatcher.class)
+//#endif
 public abstract class UnobtrusiveEntityRenderMixin {
     @Inject(method = "shouldRender", at = @At("HEAD"), cancellable = true)
     private void jjsTools$hideCloseThrown(Entity entity, Frustum frustum, double x, double y, double z,

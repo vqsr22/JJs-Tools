@@ -2,7 +2,11 @@ package dev.jjstools.mixin;
 
 import dev.jjstools.modules.Unobtrusive;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
+//#if MC >= 1.21.9
 import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+//#else
+//$$ import net.minecraft.client.render.VertexConsumerProvider;
+//#endif
 import net.minecraft.client.render.item.HeldItemRenderer;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.player.PlayerEntity;
@@ -31,13 +35,23 @@ public abstract class UnobtrusiveHeldItemMixin {
         method = "renderFirstPersonItem",
         at = @At(
             value = "INVOKE",
+            //#if MC >= 1.21.9
             target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemDisplayContext;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;I)V",
+            //#elif MC >= 1.21.5
+            //$$ target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemDisplayContext;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
+            //#else
+            //$$ target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ModelTransformationMode;ZLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
+            //#endif
             shift = At.Shift.BEFORE
         )
     )
     private void jjsTools$moveShield(AbstractClientPlayerEntity player, float tickDelta, float pitch, Hand hand,
                                      float swingProgress, ItemStack item, float equipProgress, MatrixStack matrices,
+                                     //#if MC >= 1.21.9
                                      OrderedRenderCommandQueue queue, int light, CallbackInfo ci) {
+                                     //#else
+                                     //$$ VertexConsumerProvider queue, int light, CallbackInfo ci) {
+                                     //#endif
         float shift = Unobtrusive.shieldOffset(item);
         if (shift != 0.0F) matrices.translate(0.0F, shift, 0.0F);
     }
@@ -51,16 +65,28 @@ public abstract class UnobtrusiveHeldItemMixin {
      * hand, so the item, the shield and the food all dip by the same reduced amount.
      */
     @ModifyArg(
+        //#if MC >= 1.21.9
         method = "renderItem(FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/network/ClientPlayerEntity;I)V",
         at = @At(
             value = "INVOKE",
             target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderFirstPersonItem(Lnet/minecraft/client/network/AbstractClientPlayerEntity;FFLnet/minecraft/util/Hand;FLnet/minecraft/item/ItemStack;FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;I)V"
         ),
+        //#else
+        //$$ method = "renderItem(FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider$Immediate;Lnet/minecraft/client/network/ClientPlayerEntity;I)V",
+        //$$ at = @At(
+        //$$     value = "INVOKE",
+        //$$     target = "Lnet/minecraft/client/render/item/HeldItemRenderer;renderFirstPersonItem(Lnet/minecraft/client/network/AbstractClientPlayerEntity;FFLnet/minecraft/util/Hand;FLnet/minecraft/item/ItemStack;FLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V"
+        //$$ ),
+        //#endif
         index = 6
     )
     private float jjsTools$limitDip(AbstractClientPlayerEntity player, float tickDelta, float pitch, Hand hand,
                                     float swingProgress, ItemStack item, float equipProgress, MatrixStack matrices,
+                                    //#if MC >= 1.21.9
                                     OrderedRenderCommandQueue queue, int light) {
+                                    //#else
+                                    //$$ VertexConsumerProvider queue, int light) {
+                                    //#endif
         return Unobtrusive.limitDip(equipProgress, hand);
     }
 

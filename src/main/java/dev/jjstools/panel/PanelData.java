@@ -9,7 +9,11 @@ import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.game.ReceiveMessageEvent;
 import meteordevelopment.meteorclient.events.game.SendMessageEvent;
 import meteordevelopment.meteorclient.events.meteor.KeyEvent;
+//#if MC >= 1.21.9
 import meteordevelopment.meteorclient.events.meteor.MouseClickEvent;
+//#else
+//$$ import meteordevelopment.meteorclient.events.meteor.MouseButtonEvent;
+//#endif
 import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.meteorclient.events.render.Render3DEvent;
 import meteordevelopment.meteorclient.events.world.TickEvent;
@@ -91,7 +95,7 @@ public final class PanelData {
     private void onKey(KeyEvent event) {
         if (event.action != KeyAction.Press) return;
         Keybind bind = ControlPanel.openKey();
-        if (bind == null || !bind.isSet() || !bind.matches(event.input)) return;
+        if (bind == null || !bind.isSet() || !dev.jjstools.compat.Compat.matches(bind, event)) return;
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.currentScreen == null && mc.player != null) {
@@ -104,10 +108,14 @@ public final class PanelData {
     }
 
     @EventHandler
+    //#if MC >= 1.21.9
     private void onMouse(MouseClickEvent event) {
+    //#else
+    //$$ private void onMouse(MouseButtonEvent event) {
+    //#endif
         if (event.action != KeyAction.Press) return;
         Keybind bind = ControlPanel.openKey();
-        if (bind == null || !bind.isSet() || !bind.matches(event.input)) return;
+        if (bind == null || !bind.isSet() || !dev.jjstools.compat.Compat.matches(bind, event)) return;
 
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc.currentScreen == null && mc.player != null) {
@@ -176,7 +184,7 @@ public final class PanelData {
     private void onEntity(EntityAddedEvent event) {
         Entity entity = event.entity;
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (entity instanceof PlayerEntity player && player != mc.player) SessionStats.sawPlayer(player.getGameProfile().name());
+        if (entity instanceof PlayerEntity player && player != mc.player) SessionStats.sawPlayer(dev.jjstools.compat.Compat.name(player.getGameProfile()));
     }
 
     @EventHandler

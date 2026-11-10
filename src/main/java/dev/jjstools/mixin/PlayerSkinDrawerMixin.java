@@ -4,7 +4,11 @@ import dev.jjstools.modules.TabOptimizer;
 import dev.jjstools.tab.HeadAtlas;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.PlayerSkinDrawer;
+//#if MC >= 1.21.9
 import net.minecraft.entity.player.SkinTextures;
+//#else
+//$$ import net.minecraft.client.util.SkinTextures;
+//#endif
 import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -21,22 +25,38 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(PlayerSkinDrawer.class)
 public abstract class PlayerSkinDrawerMixin {
 
+    //#if MC >= 1.21.9
     @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/entity/player/SkinTextures;III)V", at = @At("HEAD"), cancellable = true, require = 0)
+    //#else
+    //$$ @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/client/util/SkinTextures;III)V", at = @At("HEAD"), cancellable = true, require = 0)
+    //#endif
     private static void jjstools$head(DrawContext context, SkinTextures textures, int x, int y, int size, CallbackInfo ci) {
         if (jjstools$blocked()) ci.cancel();
     }
 
+    //#if MC >= 1.21.9
     @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/entity/player/SkinTextures;IIII)V", at = @At("HEAD"), cancellable = true, require = 0)
+    //#else
+    //$$ @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/client/util/SkinTextures;IIII)V", at = @At("HEAD"), cancellable = true, require = 0)
+    //#endif
     private static void jjstools$headColored(DrawContext context, SkinTextures textures, int x, int y, int size, int color, CallbackInfo ci) {
         if (jjstools$blocked()) ci.cancel();
     }
 
+    //#if MC >= 1.21.9
     @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/entity/player/SkinTextures;III)V", at = @At("RETURN"), require = 0)
+    //#else
+    //$$ @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/client/util/SkinTextures;III)V", at = @At("RETURN"), require = 0)
+    //#endif
     private static void jjstools$headDone(DrawContext context, SkinTextures textures, int x, int y, int size, CallbackInfo ci) {
         TabOptimizer.inHead = false;
     }
 
+    //#if MC >= 1.21.9
     @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/entity/player/SkinTextures;IIII)V", at = @At("RETURN"), require = 0)
+    //#else
+    //$$ @Inject(method = "draw(Lnet/minecraft/client/gui/DrawContext;Lnet/minecraft/client/util/SkinTextures;IIII)V", at = @At("RETURN"), require = 0)
+    //#endif
     private static void jjstools$headColoredDone(DrawContext context, SkinTextures textures, int x, int y, int size, int color, CallbackInfo ci) {
         TabOptimizer.inHead = false;
     }

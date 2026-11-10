@@ -116,7 +116,7 @@ public final class ChatLog {
     private static synchronized void add(String name, boolean incoming, String text) {
         load();
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player != null && name.equalsIgnoreCase(mc.player.getGameProfile().name())) return;
+        if (mc.player != null && name.equalsIgnoreCase(dev.jjstools.compat.Compat.name(mc.player.getGameProfile()))) return;
 
         Contact c = contact(name);
         long now = System.currentTimeMillis();

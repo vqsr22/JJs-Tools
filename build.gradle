@@ -4,7 +4,8 @@ plugins {
 
 // One codebase, several Minecraft versions. Pick one with -Pminecraft_version=1.21.4 (the default
 // is set in gradle.properties). The mappings and Meteor build for it come from
-// versions/<version>.properties, and any code that only fits that version from src/mc/<version>.
+// versions/<version>.properties. Code that differs between versions is written in //#if blocks,
+// see gradle/versioned.gradle.
 def mcVersion = project.minecraft_version
 def versionFile = file("versions/${mcVersion}.properties")
 if (!versionFile.exists()) {
@@ -22,12 +23,7 @@ base {
 	archivesName = project.archives_base_name
 }
 
-sourceSets {
-	main {
-		java.srcDirs += "src/mc/${mcVersion}/java"
-		resources.srcDirs += "src/mc/${mcVersion}/resources"
-	}
-}
+apply from: 'gradle/versioned.gradle'
 
 repositories {
 	mavenCentral()
@@ -65,6 +61,7 @@ processResources {
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 21
+	it.options.compilerArgs += ["-Xmaxerrs", "100000"]
 }
 
 java {

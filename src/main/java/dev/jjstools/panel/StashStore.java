@@ -625,7 +625,7 @@ public final class StashStore {
         c.z = openPos.getZ();
         c.kind = openKind;
         c.updated = System.currentTimeMillis();
-        c.by = mc.player.getGameProfile().name();
+        c.by = dev.jjstools.compat.Compat.name(mc.player.getGameProfile());
         c.items = items;
         c.decoded = stacks;
         openStash.containers.put(openKey, c);
@@ -762,7 +762,7 @@ public final class StashStore {
         c.z = pos.getZ();
         c.kind = kind;
         c.updated = System.currentTimeMillis();
-        c.by = mc.player.getGameProfile().name();
+        c.by = dev.jjstools.compat.Compat.name(mc.player.getGameProfile());
         c.items = items;
         c.decoded = copies;
         best.containers.put(k, c);

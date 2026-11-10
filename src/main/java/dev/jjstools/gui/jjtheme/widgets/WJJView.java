@@ -17,7 +17,11 @@ public class WJJView extends WView implements JJWidget {
             double u = theme().unit();
             double bw = Math.min(handleWidth(), u * 3);
             // Monkeytype's corners on its scroll bar are small, two pixels at its sizes.
+            //#if MC >= 1.21.9
             round(renderer, handleX() + handleWidth() - bw, handleY() + u, bw, handleHeight() - u * 2, u, theme().scrollbarColor.get(focused, handleMouseOver));
+            //#else
+            //$$ round(renderer, handleX() + handleWidth() - bw, handleY() + u, bw, handleHeight() - u * 2, u, theme().scrollbarColor.get(handlePressed, handleMouseOver));
+            //#endif
         }
     }
 }
