@@ -45,6 +45,13 @@ public class ControlPanel extends Module {
         .build()
     );
 
+    private final Setting<Double> animationSpeed = sgLook.add(new DoubleSetting.Builder()
+        .name("animation-speed")
+        .description("How fast windows, buttons, dropdowns, module lists and the module wheel animate, in JJ's theme and the Control Panel. 1 is normal, 2 twice as fast, 0 no animation at all.")
+        .defaultValue(1.0).min(0).max(3).sliderRange(0, 3)
+        .build()
+    );
+
     private final Setting<Integer> fadeTime = sgLook.add(new IntSetting.Builder()
         .name("button-fade-time")
         .description("How long the close and maximise buttons take to fade in and out when you hover over them, in milliseconds. 0 shows them straight away.")
@@ -332,6 +339,11 @@ public class ControlPanel extends Module {
     public static int encountersSaveInterval() {
         ControlPanel m = instance();
         return m == null ? 30 : m.encountersSaveInterval.get();
+    }
+
+    public static double animationSpeed() {
+        ControlPanel m = instance();
+        return m == null ? 1 : m.animationSpeed.get();
     }
 
     public static double pearlWaitTime() {

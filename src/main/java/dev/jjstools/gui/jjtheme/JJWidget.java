@@ -20,23 +20,41 @@ public interface JJWidget extends BaseWidget {
      * Meteor's square ones. A thin rounded outline sits under a rounded fill.
      */
     default void renderBackground(GuiRenderer renderer, WWidget widget, Color outlineColor, Color backgroundColor) {
+        renderBox(renderer, widget.x, widget.y, widget.width, widget.height, outlineColor, backgroundColor);
+    }
+
+    /** A rounded box, with a thin outline under it when the outline colour shows. */
+    default void renderBox(GuiRenderer renderer, double x, double y, double w, double h, Color outlineColor, Color backgroundColor) {
         JJGuiTheme theme = theme();
         double r = theme.radius();
 
         // An outline only when it is meant to show; the panel's buttons have none.
         if (outlineColor.a > 0) {
             double s = Math.max(1, Math.round(theme.unit()));
-            round(renderer, widget.x, widget.y, widget.width, widget.height, r, outlineColor);
-            round(renderer, widget.x + s, widget.y + s, widget.width - s * 2, widget.height - s * 2, Math.max(0, r - s), backgroundColor);
+            round(renderer, x, y, w, h, r, outlineColor);
+            round(renderer, x + s, y + s, w - s * 2, h - s * 2, Math.max(0, r - s), backgroundColor);
         } else {
-            round(renderer, widget.x, widget.y, widget.width, widget.height, r, backgroundColor);
+            round(renderer, x, y, w, h, r, backgroundColor);
         }
     }
 
-    /** A button's background: the button shade, swapping to the text colour under the mouse, instantly, as the panel's. */
+    /**
+     * A button's background: the button shade, swapping to the text colour under the mouse,
+     * instantly, as the panel's. Held down it sits a touch smaller at once, and eases back to
+     * full size when let go.
+     */
     default void renderBackground(GuiRenderer renderer, WWidget widget, boolean pressed, boolean mouseOver) {
         JJGuiTheme theme = theme();
-        renderBackground(renderer, widget, theme.outlineColor.get(pressed, mouseOver, true), theme.backgroundColor.get(pressed, mouseOver, true));
+        double k = dev.jjstools.util.Motion.press(widget, pressed);
+        double w = widget.width * k, h = widget.height * k;
+        renderBox(renderer, widget.x + (widget.width - w) / 2, widget.y + (widget.height - h) / 2, w, h,
+            theme.outlineColor.get(pressed, mouseOver, true), theme.backgroundColor.get(pressed, mouseOver, true));
+    }
+
+    /** A rounded rectangle drawn at a size about its middle, for presses and pulses. */
+    default void roundScaled(GuiRenderer renderer, double x, double y, double w, double h, double radius, Color color, double k) {
+        double sw = w * k, sh = h * k;
+        round(renderer, x + (w - sw) / 2, y + (h - sh) / 2, sw, sh, radius * k, color);
     }
 
     /** A card like the panel's windows: a thin outline a step towards the dim text, then the panel colour. */

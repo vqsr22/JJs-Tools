@@ -37,7 +37,7 @@ public abstract class ModulesScreenMixin extends TabScreen {
 
         WJJSearchBar bar = new WJJSearchBar();
         addDirect(bar);
-        bar.box.setFocused(true);
+        // Not typing into it until it is clicked (or Ctrl+F), so no caret is waiting in it on open.
         searchTextBox = bar.box;
 
         // Meteor keeps the search window in its list of windows and unfolds it on Ctrl+F; a

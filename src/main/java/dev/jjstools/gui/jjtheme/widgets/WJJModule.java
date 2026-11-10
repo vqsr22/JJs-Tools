@@ -78,11 +78,16 @@ public class WJJModule extends WPressable implements JJWidget {
         boolean mouseOver = this.mouseOver && !WJJWindow.resizingAny;
         boolean pressed = this.pressed && !WJJWindow.resizingAny;
         double mx = marginX(), my = marginY();
-        double bx = x + mx, by = y + my, bw = width - mx * 2, bh = height - my * 2;
+        // Coming in: each row a moment after the one above it, rising a little and fading in.
+        double in = entrance();
+        double rise = (1 - in) * theme.scale(6);
+        double bx = x + mx, by = y + my + rise, bw = width - mx * 2, bh = height - my * 2;
+        // Smaller while held, and a short pulse when the module turns on.
+        double k = dev.jjstools.util.Motion.press(this, pressed) * dev.jjstools.util.Motion.pulseOnTurn(this, on);
         // Held down: the dim colour, as monkeytype's buttons, so a click shows.
-        if (pressed) round(renderer, bx, by, bw, bh, theme.radius(), theme.textSecondaryColor.get());
-        else if (mouseOver) round(renderer, bx, by, bw, bh, theme.radius(), theme.textColor.get());
-        else if (on) round(renderer, bx, by, bw, bh, theme.radius(), theme.moduleBackground.get());
+        if (pressed) roundScaled(renderer, bx, by, bw, bh, theme.radius(), faded(theme.textSecondaryColor.get(), in), k);
+        else if (mouseOver) roundScaled(renderer, bx, by, bw, bh, theme.radius(), faded(theme.textColor.get(), in), k);
+        else if (on) roundScaled(renderer, bx, by, bw, bh, theme.radius(), faded(theme.moduleBackground.get(), in), k);
 
         String shown = theme.shown(title);
         double w = titleWidth;
@@ -96,7 +101,37 @@ public class WJJModule extends WPressable implements JJWidget {
             x += room - w;
         }
 
-        renderer.text(shown, x, by + pad, theme.ink(pressed || mouseOver || on), false);
+        renderer.text(shown, x, by + pad, faded(theme.ink(pressed || mouseOver || on), in), false);
+    }
+
+    private int row = -1;
+
+    /**
+     * How far in this row is, 0 to 1, after the screen opens: its column a moment after the one
+     * to its left, and each row in it a moment after the one above, so the list settles in
+     * order. Only the first dozen rows wait; the rest come in with the twelfth.
+     */
+    private double entrance() {
+        if (row < 0 && parent instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer c) {
+            row = 0;
+            for (var cell : c.cells) {
+                if (cell.widget() == this) break;
+                row++;
+            }
+        }
+        double opened = dev.jjstools.util.Motion.openedAt(mc.currentScreen);
+        if (dev.jjstools.util.Motion.now() - opened > 1500) return 1;
+        double delay = WJJWindow.columnIndex(this) * dev.jjstools.util.Motion.STAGGER_MS
+            + Math.min(Math.max(row, 0), 12) * dev.jjstools.util.Motion.STAGGER_MS;
+        return dev.jjstools.util.Motion.enter(opened, delay);
+    }
+
+    /** A colour with its see-through-ness scaled, for fading in. */
+    private static meteordevelopment.meteorclient.utils.render.color.Color faded(meteordevelopment.meteorclient.utils.render.color.Color c, double k) {
+        if (k >= 1) return c;
+        meteordevelopment.meteorclient.utils.render.color.Color copy = new meteordevelopment.meteorclient.utils.render.color.Color(c);
+        copy.a = (int) Math.round(c.a * k);
+        return copy;
     }
 
     private double marginX() {

@@ -14,6 +14,8 @@
 
 JJ's Tools is a [Meteor Client][meteor] add-on specifically built for 2b2t.
 
+Credit to lambda and stardust for some modules
+
 ## Requirements
 
 | Requirement | Description |
@@ -41,22 +43,23 @@ JJ's Tools is a [Meteor Client][meteor] add-on specifically built for 2b2t.
 | **Auto Turtle Helmet** | Puts on a turtle helmet from your inventory |
 | **Auto Wear Gold** | Wears a gold piece while piglins are near |
 | **Bed Marker** | Marks your last spawn bed |
-| **Better Hitreg** | Makes hits feel instant |
+| **Better Hitreg** | Makes hits feel instant. Ported from [Better Hitreg][betterhitreg] |
 | **Chat Notifications** | Plays a sound on whispers and mentions |
 | **Chat Tweaks** | Cleans up green text, prefixes and client junk in chat |
-| **Control Panel** | A screen with chat, stashes, encounters, pearlbots, player lookup, deaths, session stats and your ender chest, 187 themes and custom fonts. Also adds JJ's theme and Themes and Fonts tabs to Meteor's GUI |
+| **Control Panel** | A monkeytype-style screen with chat, stashes, encounters, pearlbots, player lookup, deaths, session stats and your ender chest, 187 themes and custom fonts. Also adds JJ's theme and Themes and Fonts tabs to Meteor's GUI |
 | **Custom Trims** | Client side armour trims on your own armour |
 | **Elytra Takeoff** | Takes off with an elytra and rocket on one key |
 | **Farm Aura** | Tills and plants farmland around you |
 | **Fast Rename** | Renames items in bulk at an anvil |
+| **Friend Sync** | Copies your Meteor friends into other clients by running their friend commands for you |
 | **Grinder** | Strips enchantments at the grindstone |
 | **Incognito** | Covers your coordinates and minimap |
 | **Inventory Loadout** | Saves your inventory layout and restores it on a key |
 | **Kit Creator** | Copies a shulker box layout into another one |
 | **Light Levels** | Shows where mobs can spawn, with a per-mob filter |
-| **Module Wheel** | Hold a key and let go over a module to toggle it. Right-click and drag to move modules |
+| **Module Wheel** | Hold a key and let go over a module to toggle it or a command to run it, each with its own name and icon. Right-click and drag to rearrange |
 | **No Jolt** | Stops the health and hunger icons shaking |
-| **Optimise Tablist** | Makes the tab list cheap to draw |
+| **Optimise Tablist** | Makes the tab list cheap to draw, with an optional JJ's theme look |
 | **Pickup Loot Stream** | Shows what you pick up in a corner of the screen |
 | **Portal Print Detector** | Finds where nether portals used to be |
 | **Portal Scraps** | Finds leftover obsidian in the Nether |
@@ -85,6 +88,10 @@ JJ's Tools is a [Meteor Client][meteor] add-on specifically built for 2b2t.
 
 **Custom Text** and **Custom Shape** (rectangle, ellipse, triangle or line).
 
+## Borderless windowed
+
+Video Settings gets a **Borderless Windowed** option for instant alt-tabbing.
+
 ## Config saving
 
 `auto-save-config` in Meteor's Config tab saves your config every five minutes, so a crash does not lose your changes.
@@ -111,7 +118,9 @@ The jar is in `build/libs/` (the one without `-sources` or `-dev`).
 GPL-3.0. See [LICENSE](LICENSE).
 
 Parts are adapted from other projects, with attribution in the source files that use them.
+Better Hitreg is Apache-2.0, which GPL-3.0 permits including; the rest is GPL-3.0.
 
+[betterhitreg]: https://github.com/jasspir/BetterHitreg
 [meteor]: https://meteorclient.com
 [fabric]: https://fabricmc.net
 [xaeroplus]: https://github.com/rfresh2/XaeroPlus

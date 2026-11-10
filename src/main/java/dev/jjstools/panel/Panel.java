@@ -19,6 +19,10 @@ public abstract class Panel {
     public int x, y, w, h;
     public boolean open = true;
     public int z;
+    /** When the window was opened and how long it waited to come in, and when it was closed, for its animation. */
+    public double shownAt = -1e9, delay, hiddenAt = -1e9;
+    /** The middle of its button on the dock, which it grows out of and shrinks back into. */
+    public float tabX, tabY;
     /** Where the window was before it was made to fill the screen, or null if it does not. */
     public int[] restore;
 

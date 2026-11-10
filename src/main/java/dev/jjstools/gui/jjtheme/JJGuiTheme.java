@@ -446,6 +446,26 @@ public class JJGuiTheme extends GuiTheme {
             trialScale = -1;
         }
         moduleListScale.set(Math.floor(lo * 10000) / 10000);
+
+        // Every column too long for the screen ends the same distance from the bottom as the
+        // columns are from the sides, scrolling the rest, rather than some running off the
+        // bottom and some stopping short. In a stack only the lowest one is fitted.
+        root.calculateSize();
+        root.calculateWidgetPositions();
+        List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> columns = new java.util.ArrayList<>();
+        collectColumns(root, columns);
+        java.util.Set<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> hasBelow = new java.util.HashSet<>();
+        for (var w : columns) {
+            var above = ColumnStacks.above(w);
+            if (above != null) hasBelow.add(above);
+        }
+        double bottom = meteordevelopment.meteorclient.utils.Utils.getWindowHeight() - scale(4);
+        for (var w : columns) {
+            if (hasBelow.contains(w) || !(w instanceof dev.jjstools.gui.jjtheme.widgets.WJJWindow jw)) continue;
+            // Fitted only where the full list would not fit; a short list keeps its own height.
+            jw.fitBottomTo(bottom);
+        }
+        dev.jjstools.panel.Prefs.save();
         screen.invalidate();
     }
 
