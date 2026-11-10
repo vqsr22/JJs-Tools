@@ -20,7 +20,7 @@ Credit to lambda and stardust for some modules
 
 | Requirement | Description |
 |---|---|
-| Minecraft | 1.21.11 |
+| Minecraft | 1.21.4, 1.21.5, 1.21.8 or 1.21.11, with the matching jar |
 | Loader | [Fabric][fabric] |
 | Required | [Meteor Client][meteor] |
 | Optional | [XaeroPlus][xaeroplus], for the visited-chunk filter |
@@ -104,14 +104,44 @@ Your data is kept in `.minecraft/jjs-tools/`, mostly per account, so Meteor upda
 
 Requires JDK 21. The Gradle wrapper is included.
 
-```bash
-cd jjs-tools
-./gradlew build
+One codebase builds for every supported Minecraft version. If planning to build from the
+source, use the selected version available to build:
+
+```
+.\gradlew.bat build "-Pminecraft_version=1.21.4"
+.\gradlew.bat build "-Pminecraft_version=1.21.5"
+.\gradlew.bat build "-Pminecraft_version=1.21.8"
+.\gradlew.bat build "-Pminecraft_version=1.21.11"
 ```
 
-On Windows, `gradlew.bat build`.
+On Linux or macOS, use `./gradlew build -Pminecraft_version=1.21.4` and so on. With no
+version given it builds for 1.21.11.
 
-The jar is in `build/libs/` (the one without `-sources` or `-dev`).
+The jar is in `build/libs/`, named for its version, for example `jjs-tools-0.5.3+1.21.4.jar`
+(use the one without `-sources`). Each jar only runs on the Minecraft version in its name.
+
+### How the versions are kept in one codebase
+
+- `versions/<version>.properties` holds the mappings and Meteor build for each version.
+- Code that differs between versions is written in `//#if` blocks, for example:
+
+  ```java
+  //#if MC >= 1.21.9
+  return entity.getEntityPos();
+  //#else
+  //$$ return entity.getPos();
+  //#endif
+  ```
+
+  Before compiling, `gradle/versioned.gradle` copies `src/main` to `build/versioned/<version>`,
+  keeps the branch for the version being built and uncomments its `//$$` lines. The 1.21.11
+  branch is written as plain code, so `src/main` reads as ordinary 1.21.11 code in an IDE.
+- Small calls that were only renamed between versions go through `dev.jjstools.compat.Compat`
+  (game and Meteor calls) and `dev.jjstools.compat.Gui` (GUI drawing), so most files need no
+  version blocks at all.
+
+To add a version, add its `versions/<version>.properties` and build it; the compiler errors
+show what needs a version block.
 
 ## Licence
 

@@ -21,11 +21,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(value = ModulesScreen.class, remap = false)
 public abstract class ModulesScreenMixin extends TabScreen {
+    // Meteor keeps these for Ctrl+F from its 1.21.9 builds on; before that there is no Ctrl+F.
+    //#if MC >= 1.21.9
     @Shadow(remap = false)
     private WWindow searchWindow;
 
     @Shadow(remap = false)
     private WTextBox searchTextBox;
+    //#endif
 
     private ModulesScreenMixin(GuiTheme theme, Tab tab) {
         super(theme, tab);
@@ -38,12 +41,16 @@ public abstract class ModulesScreenMixin extends TabScreen {
         WJJSearchBar bar = new WJJSearchBar();
         addDirect(bar);
         // Not typing into it until it is clicked (or Ctrl+F), so no caret is waiting in it on open.
+        //#if MC >= 1.21.9
         searchTextBox = bar.box;
+        //#endif
 
         // Meteor keeps the search window in its list of windows and unfolds it on Ctrl+F; a
         // window that is never shown stands in for it, so nothing of Meteor's has to change.
         WWindow standIn = theme.window("Search");
+        //#if MC >= 1.21.9
         searchWindow = standIn;
+        //#endif
         cir.setReturnValue(standIn);
     }
 }

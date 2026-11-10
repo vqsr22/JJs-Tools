@@ -33,7 +33,11 @@ public abstract class BlockRenderManagerMixin {
     @Inject(method = "renderBlock", at = @At("HEAD"), cancellable = true)
     private void jjsTools$hideSignBoard(BlockState state, BlockPos pos, BlockRenderView world,
                                         MatrixStack matrices, VertexConsumer vertexConsumer,
+                                        //#if MC >= 1.21.5
                                         boolean cull, List<?> parts, CallbackInfo ci) {
+                                        //#else
+                                        //$$ boolean cull, net.minecraft.util.math.random.Random random, CallbackInfo ci) {
+                                        //#endif
         if (SignToItemFrame.hideBoard(state, pos, world)) ci.cancel();
     }
 }

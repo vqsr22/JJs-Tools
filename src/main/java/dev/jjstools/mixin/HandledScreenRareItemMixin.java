@@ -20,7 +20,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(HandledScreen.class)
 public abstract class HandledScreenRareItemMixin {
     @Inject(method = "drawSlot", at = @At("HEAD"))
+    //#if MC >= 1.21.9
     private void jjstools$rareItemBackground(DrawContext context, Slot slot, int mouseX, int mouseY, CallbackInfo ci) {
+    //#else
+    //$$ private void jjstools$rareItemBackground(DrawContext context, Slot slot, CallbackInfo ci) {
+    //#endif
         Modules modules = Modules.get();
         if (modules == null) return;
 

@@ -33,16 +33,28 @@ import java.util.List;
 @Mixin(BlockModelRenderer.class)
 public abstract class BlockModelRendererMixin {
     @Inject(method = "renderSmooth", at = @At("HEAD"), cancellable = true, require = 0)
+    //#if MC >= 1.21.5
     private void jjsTools$hideSignBoardSmooth(BlockRenderView world, List<?> parts, BlockState state,
                                               BlockPos pos, MatrixStack matrices, VertexConsumer vertexConsumer,
                                               boolean cull, int overlay, CallbackInfo ci) {
+    //#else
+    //$$ private void jjsTools$hideSignBoardSmooth(BlockRenderView world, net.minecraft.client.render.model.BakedModel model, BlockState state,
+    //$$                                           BlockPos pos, MatrixStack matrices, VertexConsumer vertexConsumer,
+    //$$                                           boolean cull, net.minecraft.util.math.random.Random random, long seed, int overlay, CallbackInfo ci) {
+    //#endif
         if (SignToItemFrame.hideBoard(state, pos, world)) ci.cancel();
     }
 
     @Inject(method = "renderFlat", at = @At("HEAD"), cancellable = true, require = 0)
+    //#if MC >= 1.21.5
     private void jjsTools$hideSignBoardFlat(BlockRenderView world, List<?> parts, BlockState state,
                                             BlockPos pos, MatrixStack matrices, VertexConsumer vertexConsumer,
-                                            boolean cull, int overlay, CallbackInfo ci) {
+                                              boolean cull, int overlay, CallbackInfo ci) {
+    //#else
+    //$$ private void jjsTools$hideSignBoardFlat(BlockRenderView world, net.minecraft.client.render.model.BakedModel model, BlockState state,
+    //$$                                           BlockPos pos, MatrixStack matrices, VertexConsumer vertexConsumer,
+    //$$                                           boolean cull, net.minecraft.util.math.random.Random random, long seed, int overlay, CallbackInfo ci) {
+    //#endif
         if (SignToItemFrame.hideBoard(state, pos, world)) ci.cancel();
     }
 
@@ -52,6 +64,8 @@ public abstract class BlockModelRendererMixin {
      * If the two above ever stop being the way in, every face still goes through this, so a
      * sign whose board slipped past them loses its faces one at a time instead.
      */
+    // 1.21.4 has no shouldDrawFace; the two hooks above are enough there.
+    //#if MC >= 1.21.5
     @Inject(method = "shouldDrawFace", at = @At("HEAD"), cancellable = true, require = 0)
     private static void jjsTools$hideSignFace(BlockRenderView world, BlockState state, boolean cull,
                                               net.minecraft.util.math.Direction direction, BlockPos pos,
@@ -63,4 +77,5 @@ public abstract class BlockModelRendererMixin {
         BlockPos self = pos.offset(direction.getOpposite());
         if (SignToItemFrame.hideBoard(state, self, world)) cir.setReturnValue(false);
     }
+    //#endif
 }

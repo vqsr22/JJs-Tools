@@ -19,7 +19,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(World.class)
 public abstract class WorldMixin implements WorldAccess, AutoCloseable {
     // See FastRename.java
+    //#if MC >= 1.21.5
     @Inject(method = "playSoundAtBlockCenterClient", at = @At("HEAD"), cancellable = true)
+    //#else
+    //$$ @Inject(method = "playSoundAtBlockCenter", at = @At("HEAD"), cancellable = true)
+    //#endif
     private void mixinPlaySoundAtBlockCenter(BlockPos pos, SoundEvent sound, SoundCategory category, float volume, float pitch, boolean useDistance, CallbackInfo ci) {
         Modules modules = Modules.get();
         if (modules == null) return;

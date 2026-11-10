@@ -16,11 +16,26 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(targets = "meteordevelopment.meteorclient.systems.modules.combat.AutoArmor$ArmorPiece", remap = false)
 public abstract class AutoArmorMixin {
+    //#if MC >= 1.21.5
     @Shadow @Final private EquipmentSlot slot;
+    //#else
+    //$$ // Meteor's 1.21.4 build numbers its armour pieces from the feet up instead.
+    //$$ @Shadow @Final private int id;
+    //#endif
     @Shadow private int score;
 
     @Inject(method = "calculate", at = @At("TAIL"))
     private void jjstools$yieldToArmorSwap(CallbackInfo ci) {
+        //#if MC >= 1.21.5
         if (ArmorSwapModule.claims(slot)) score = Integer.MAX_VALUE;
+        //#else
+        //$$ EquipmentSlot slot = switch (id) {
+        //$$     case 0 -> EquipmentSlot.FEET;
+        //$$     case 1 -> EquipmentSlot.LEGS;
+        //$$     case 2 -> EquipmentSlot.CHEST;
+        //$$     default -> EquipmentSlot.HEAD;
+        //$$ };
+        //$$ if (ArmorSwapModule.claims(slot)) score = Integer.MAX_VALUE;
+        //#endif
     }
 }

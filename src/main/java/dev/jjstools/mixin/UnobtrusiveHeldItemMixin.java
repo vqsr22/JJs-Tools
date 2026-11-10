@@ -98,6 +98,7 @@ public abstract class UnobtrusiveHeldItemMixin {
      * to Unobtrusive, which does the lift itself and turns the item level instead.
      */
     /** Slows and shrinks the eating bob, the only cosine in the eating animation. */
+    //#if MC >= 1.21.9
     @WrapOperation(
         method = "applyEatOrDrinkTransformation",
         at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/MathHelper;cos(D)F"),
@@ -106,6 +107,17 @@ public abstract class UnobtrusiveHeldItemMixin {
     private float jjsTools$dampEatBob(double angle, Operation<Float> original) {
         return Unobtrusive.eatBob(angle, a -> original.call(a));
     }
+    //#else
+    //$$ // Before 1.21.9 the bob's cosine takes a float.
+    //$$ @WrapOperation(
+    //$$     method = "applyEatOrDrinkTransformation",
+    //$$     at = @At(value = "INVOKE", target = "Lnet/minecraft/util/math/MathHelper;cos(F)F"),
+    //$$     require = 0
+    //$$ )
+    //$$ private float jjsTools$dampEatBob(float angle, Operation<Float> original) {
+    //$$     return Unobtrusive.eatBob(angle, a -> original.call((float) a));
+    //$$ }
+    //#endif
 
     @Inject(
         method = "applyEatOrDrinkTransformation",

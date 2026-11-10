@@ -43,6 +43,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 public abstract class HandledScreenTitleMixin {
     @Shadow @Final protected ScreenHandler handler;
 
+    //#if MC >= 1.21.6
     @Redirect(
         method = "drawForeground",
         at = @At(
@@ -53,6 +54,27 @@ public abstract class HandledScreenTitleMixin {
     )
     private void jjsTools$fitTitle(DrawContext context, TextRenderer textRenderer, Text text,
                                    int x, int y, int colour, boolean shadow) {
+        jjsTools$drawTitle(context, textRenderer, text, x, y, colour, shadow);
+    }
+    //#else
+    //$$ // Before 1.21.6 drawText gives back where the text ends.
+    //$$ @Redirect(
+    //$$     method = "drawForeground",
+    //$$     at = @At(
+    //$$         value = "INVOKE",
+    //$$         target = "Lnet/minecraft/client/gui/DrawContext;drawText(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/text/Text;IIIZ)I"
+    //$$     ),
+    //$$     require = 0
+    //$$ )
+    //$$ private int jjsTools$fitTitle(DrawContext context, TextRenderer textRenderer, Text text,
+    //$$                               int x, int y, int colour, boolean shadow) {
+    //$$     jjsTools$drawTitle(context, textRenderer, text, x, y, colour, shadow);
+    //$$     return x + textRenderer.getWidth(text);
+    //$$ }
+    //#endif
+
+    private void jjsTools$drawTitle(DrawContext context, TextRenderer textRenderer, Text text,
+                                    int x, int y, int colour, boolean shadow) {
         boolean storage = (Object) this instanceof ShulkerBoxScreen
             || (Object) this instanceof GenericContainerScreen && StorageGuiTweaks.fitsChestTitles();
 

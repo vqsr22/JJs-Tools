@@ -26,15 +26,23 @@ public abstract class UnobtrusiveFireMixin {
     private static float jjsTools$fireShift;
 
     @Inject(method = "renderFireOverlay", at = @At("HEAD"))
+    //#if MC >= 1.21.9
     private static void jjsTools$moveFire(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Sprite sprite,
                                           CallbackInfo ci) {
+    //#else
+    //$$ private static void jjsTools$moveFire(MatrixStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
+    //#endif
         jjsTools$fireShift = Unobtrusive.fireOffset();
         if (jjsTools$fireShift != 0.0F) matrices.translate(0.0F, jjsTools$fireShift, 0.0F);
     }
 
     @Inject(method = "renderFireOverlay", at = @At("RETURN"))
+    //#if MC >= 1.21.9
     private static void jjsTools$restoreFire(MatrixStack matrices, VertexConsumerProvider vertexConsumers, Sprite sprite,
                                              CallbackInfo ci) {
+    //#else
+    //$$ private static void jjsTools$restoreFire(MatrixStack matrices, VertexConsumerProvider vertexConsumers, CallbackInfo ci) {
+    //#endif
         if (jjsTools$fireShift != 0.0F) matrices.translate(0.0F, -jjsTools$fireShift, 0.0F);
         jjsTools$fireShift = 0.0F;
     }
