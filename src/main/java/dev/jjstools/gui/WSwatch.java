@@ -77,12 +77,11 @@ public class WSwatch extends WPressable {
             var ctx = ((dev.jjstools.mixin.GuiRendererAccessor) renderer).jjstools$getDrawContext();
             if (ctx == null) return;
             if (vanilla) {
-                var m = ctx.getMatrices();
-                m.pushMatrix();
-                m.translate(px, py);
-                m.scale(k, k);
+                dev.jjstools.compat.Gui.push(ctx);
+                dev.jjstools.compat.Gui.translate(ctx, px, py);
+                dev.jjstools.compat.Gui.scale(ctx, k, k);
                 ctx.drawText(mc.textRenderer, label, 0, 0, argb, false);
-                m.popMatrix();
+                dev.jjstools.compat.Gui.pop(ctx);
             } else {
                 f.draw(ctx, mc.textRenderer, label, px, py, k, argb);
             }

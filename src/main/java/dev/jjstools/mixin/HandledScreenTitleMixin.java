@@ -98,10 +98,10 @@ public abstract class HandledScreenTitleMixin {
          */
         float drop = textRenderer.fontHeight * (1.0F - scale) * 0.5F;
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(x, y + drop);
-        context.getMatrices().scale(scale, scale);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.translate(context, x, y + drop);
+        dev.jjstools.compat.Gui.scale(context, scale, scale);
         context.drawText(textRenderer, text, 0, 0, colour, shadow);
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
     }
 }

@@ -474,11 +474,10 @@ public class ModuleWheel extends Module {
             // The whole wheel grows out of its middle from 95% as it opens, easing out, and
             // shrinks back into it, a fifth quicker, when done.
             float grow = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * whole);
-            var whole2 = ctx.getMatrices();
-            whole2.pushMatrix();
-            whole2.translate(cx, cy);
-            whole2.scale(grow, grow);
-            whole2.translate(-cx, -cy);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, cx, cy);
+            dev.jjstools.compat.Gui.scale(ctx, grow, grow);
+            dev.jjstools.compat.Gui.translate(ctx, -cx, -cy);
             disc(ctx, cx, cy, r, panel);
             disc(ctx, cx, cy, safe, well);
 
@@ -532,7 +531,7 @@ public class ModuleWheel extends Module {
             // The one being moved last, so it is drawn over the rest.
             for (int i = 0; i < list.size(); i++) if (list.get(i) != dragging) slot(ctx, tr, font, list.get(i), i == over, cx, cy, panel, accent, text);
             if (dragging != null) slot(ctx, tr, font, dragging, true, cx, cy, panel, accent, text);
-            whole2.popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
         }
 
         private void slot(DrawContext ctx, TextRenderer tr, boolean font, Slot m, boolean hot, int cx, int cy, int panel, int accent, int text) {
@@ -549,32 +548,31 @@ public class ModuleWheel extends Module {
             float icon = 16 * ki, textH = lineH * kt;
             int pw = Math.round(Math.max(w, icon) + 10), ph = Math.round(4 + icon + 2 + textH + 4);
             float k = (float) dev.jjstools.util.Motion.pulseScale(m);
-            var matrices = ctx.getMatrices();
-            matrices.pushMatrix();
-            matrices.translate((float) lx, (float) ly);
-            matrices.scale(k, k);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, (float) lx, (float) ly);
+            dev.jjstools.compat.Gui.scale(ctx, k, k);
             int px = -pw / 2, py = -ph / 2;
             // Monkeytype's swap: under the mouse, text colour behind and background colour on top.
             if (hot) round(ctx, px, py, pw, ph, 5, text, k);
-            matrices.pushMatrix();
-            matrices.translate(0, py + 4);
-            matrices.scale(ki, ki);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, 0, py + 4);
+            dev.jjstools.compat.Gui.scale(ctx, ki, ki);
             ctx.drawItem(stackFor(m), -8, 0);
-            matrices.popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
             int ink = hot ? panel : m.active() ? accent : text;
-            matrices.pushMatrix();
-            matrices.translate(-w / 2, py + 4 + icon + 2);
-            matrices.scale(kt, kt);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, -w / 2, py + 4 + icon + 2);
+            dev.jjstools.compat.Gui.scale(ctx, kt, kt);
             if (font) UiFont.draw(ctx, tr, name, 0, 0, 1.0F, ink);
             else ctx.drawText(tr, name, 0, 0, ink, false);
-            matrices.popMatrix();
-            matrices.popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
+            dev.jjstools.compat.Gui.pop(ctx);
         }
 
         private void disc(DrawContext ctx, int cx, int cy, int r, int argb) {
-            int rp = Math.max(1, (int) Math.round(r * MinecraftClient.getInstance().getWindow().getScaleFactor()));
+            int rp = Math.max(1, (int) Math.round(r * dev.jjstools.compat.Gui.scaleFactor()));
             var c = UiShapes.circle(rp);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), cx - r, cy - r, 0, 0, r * 2, r * 2, rp * 2, rp * 2, c.w(), c.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), cx - r, cy - r, 0, 0, r * 2, r * 2, rp * 2, rp * 2, c.w(), c.h(), argb);
         }
 
         private void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb, float scale) {
@@ -582,12 +580,12 @@ public class ModuleWheel extends Module {
             ctx.fill(x + r, y, x + w - r, y + h, argb);
             ctx.fill(x, y + r, x + r, y + h - r, argb);
             ctx.fill(x + w - r, y + r, x + w, y + h - r, argb);
-            int rp = Math.max(1, (int) Math.round(r * scale * MinecraftClient.getInstance().getWindow().getScaleFactor()));
+            int rp = Math.max(1, (int) Math.round(r * scale * dev.jjstools.compat.Gui.scaleFactor()));
             var c = UiShapes.circle(rp);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x, y, 0, 0, r, r, rp, rp, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x + w - r, y, rp, 0, r, r, rp, rp, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x, y + h - r, 0, rp, r, r, rp, rp, c.w(), c.h(), argb);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x + w - r, y + h - r, rp, rp, r, r, rp, rp, c.w(), c.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), x, y, 0, 0, r, r, rp, rp, c.w(), c.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), x + w - r, y, rp, 0, r, r, rp, rp, c.w(), c.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), x, y + h - r, 0, rp, r, r, rp, rp, c.w(), c.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), x + w - r, y + h - r, rp, rp, r, r, rp, rp, c.w(), c.h(), argb);
         }
     }
 }

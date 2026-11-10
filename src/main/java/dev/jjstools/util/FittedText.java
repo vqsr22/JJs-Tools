@@ -5,7 +5,6 @@ import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
-import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +57,7 @@ public final class FittedText {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.getWindow() == null || limit <= 0) return false;
 
-        int gui = mc.getWindow().getScaleFactor();
+        int gui = dev.jjstools.compat.Gui.scaleFactor();
         int budget = limit * gui;
 
         /*
@@ -147,7 +146,6 @@ public final class FittedText {
         // Half the height the line loses, rounded to a screen pixel so it stays on the grid.
         float drop = Math.round(textRenderer.fontHeight * (1.0F - scale) * 0.5F * gui) / (float) gui;
 
-        Matrix3x2fStack matrices = context.getMatrices();
         int pen = 0;
         int seenSpaces = 0;
 
@@ -166,11 +164,11 @@ public final class FittedText {
                 continue;
             }
 
-            matrices.pushMatrix();
-            matrices.translate(x + pen / (float) gui, y + drop);
-            matrices.scale(scale, scale);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.translate(context, x + pen / (float) gui, y + drop);
+            dev.jjstools.compat.Gui.scale(context, scale, scale);
             context.drawText(textRenderer, glyphs.get(i), 0, 0, colour, shadow);
-            matrices.popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
 
             pen += advance;
         }

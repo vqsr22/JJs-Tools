@@ -5,6 +5,9 @@
 
 package dev.jjstools.gui.jjtheme.widgets.pressable;
 
+// Meteor only has confirmed buttons from its 1.21.6 builds on.
+//#if MC >= 1.21.6
+
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import meteordevelopment.meteorclient.gui.renderer.packer.GuiTexture;
 import dev.jjstools.gui.jjtheme.JJGuiTheme;
@@ -40,3 +43,4 @@ public class WJJConfirmedButton extends WConfirmedButton implements JJWidget {
         }
     }
 }
+//#endif

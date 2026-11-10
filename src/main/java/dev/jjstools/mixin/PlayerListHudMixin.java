@@ -117,9 +117,9 @@ public abstract class PlayerListHudMixin implements TabHooks {
                 float centreX = scaledWindowWidth / 2.0f;
                 float topMargin = 10.0f;
 
-                context.getMatrices().pushMatrix();
-                context.getMatrices().translate(centreX * (1.0f - s), topMargin * (1.0f - s));
-                context.getMatrices().scale(s, s);
+                dev.jjstools.compat.Gui.push(context);
+                dev.jjstools.compat.Gui.translate(context, centreX * (1.0f - s), topMargin * (1.0f - s));
+                dev.jjstools.compat.Gui.scale(context, s, s);
                 pushed = true;
             }
 
@@ -127,7 +127,7 @@ public abstract class PlayerListHudMixin implements TabHooks {
         } finally {
             TabOptimizer.renderingTab = false;
             TabOptimizer.inHead = false;
-            if (pushed) context.getMatrices().popMatrix();
+            if (pushed) dev.jjstools.compat.Gui.pop(context);
             HeadAtlas.flush();
         }
     }

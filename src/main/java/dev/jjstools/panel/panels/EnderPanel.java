@@ -43,10 +43,9 @@ public class EnderPanel extends Panel {
         int gx = x + (w - gw) / 2;
         int gy = y + (h - gh) / 2;
 
-        var m = ui.ctx.getMatrices();
-        m.pushMatrix();
-        m.translate(gx, gy);
-        m.scale(k, k);
+        dev.jjstools.compat.Gui.push(ui.ctx);
+        dev.jjstools.compat.Gui.translate(ui.ctx, gx, gy);
+        dev.jjstools.compat.Gui.scale(ui.ctx, k, k);
         ui.slotGrid(0, 0, cols, rows * cols);
         for (int i = 0; i < items.size(); i++) {
             ItemStack s = items.get(i);
@@ -73,7 +72,7 @@ public class EnderPanel extends Panel {
                 ui.fill((i % cols) * 18 + 1, (i / cols) * 18 + 1, 16, 16, 0x80FFFFFF);
             }
         }
-        m.popMatrix();
+        dev.jjstools.compat.Gui.pop(ui.ctx);
         if (hover >= 0) ui.itemTooltip(items.get(hover), Screen.getTooltipFromItem(MinecraftClient.getInstance(), items.get(hover)));
     }
 }

@@ -51,7 +51,7 @@ public final class HeadAtlas {
 
         int u = (cell % PER_ROW) * CELL;
         int v = (cell / PER_ROW) * CELL;
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, ID, x, y, u, v, size, size, CELL, CELL, SIZE, SIZE, color);
+        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, ID, x, y, u, v, size, size, CELL, CELL, SIZE, SIZE, color);
         return true;
     }
 

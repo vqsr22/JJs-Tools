@@ -256,13 +256,13 @@ public class LightLevels extends Module {
 
     @Override
     public void onDeactivate() {
-        squarePool.freeAll(squares);
+        for (Square square : squares) squarePool.free(square);
         squares.clear();
     }
 
     @EventHandler
     private void onTick(TickEvent.Pre event) {
-        squarePool.freeAll(squares);
+        for (Square square : squares) squarePool.free(square);
         squares.clear();
 
         if (mc.player == null || mc.world == null || hiddenHere()) return;

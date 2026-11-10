@@ -862,9 +862,9 @@ public class StorageGuiTweaks extends Module {
         float x = screenWidth / 2.0F - WIDTH * scale / 2.0F + previewX.get() + dx;
         float y = previewY.get() + dy;
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(x, y);
-        context.getMatrices().scale(scale, scale);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.translate(context, x, y);
+        dev.jjstools.compat.Gui.scale(context, scale, scale);
 
         Look look = look();
 
@@ -891,7 +891,7 @@ public class StorageGuiTweaks extends Module {
             drawTitle(context, alpha);
         }
 
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
     }
 
     /**
@@ -962,13 +962,13 @@ public class StorageGuiTweaks extends Module {
         int tintedRows = Math.max(0, Math.min(height, look.split() - v));
 
         if (tintedRows > 0) {
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, look.texture(), x, y, (float) x, (float) v,
+            context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, look.texture(), x, y, (float) x, (float) v,
                 width, tintedRows, 256, 256, argb(a, Colors.scale(look.rgb(), brightness)));
         }
 
         int rest = height - tintedRows;
         if (rest > 0) {
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, look.plain(), x, y + tintedRows, (float) x, (float) (v + tintedRows),
+            context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, look.plain(), x, y + tintedRows, (float) x, (float) (v + tintedRows),
                 width, rest, 256, 256, argb(a, Colors.scale(0xFFFFFF, brightness)));
         }
     }
@@ -1041,11 +1041,11 @@ public class StorageGuiTweaks extends Module {
 
         float s = limit / (float) width;
         float drop = mc.textRenderer.fontHeight * (1.0F - s) * 0.5F;
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(8.0F, 6.0F + drop);
-        context.getMatrices().scale(s, s);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.translate(context, 8.0F, 6.0F + drop);
+        dev.jjstools.compat.Gui.scale(context, s, s);
         context.drawText(mc.textRenderer, shownTitle, 0, 0, colour, false);
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
     }
 
     /** A name across the top of the panel, shrunk to fit if it is too long, as titles are. */
@@ -1059,11 +1059,11 @@ public class StorageGuiTweaks extends Module {
 
         float s = limit / (float) width;
         float drop = mc.textRenderer.fontHeight * (1.0F - s) * 0.5F;
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(8.0F, 6.0F + drop);
-        context.getMatrices().scale(s, s);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.translate(context, 8.0F, 6.0F + drop);
+        dev.jjstools.compat.Gui.scale(context, s, s);
         context.drawText(mc.textRenderer, name, 0, 0, colour, false);
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
     }
 
     // Storage tooltips
@@ -1132,9 +1132,9 @@ public class StorageGuiTweaks extends Module {
             int y = mouseY - 12;
             y = Math.max(4, Math.min(y, screenHeight - height - 4));
 
-            context.createNewRootLayer();
-            context.getMatrices().pushMatrix();
-            context.getMatrices().translate((float) x, (float) y);
+            dev.jjstools.compat.Gui.newLayer(context);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.translate(context, (float) x, (float) y);
 
             drawPanel(context, look(), 1.0F);
             drawItems(context);
@@ -1148,7 +1148,7 @@ public class StorageGuiTweaks extends Module {
                 drawTitle(context, 1.0F);
             }
 
-            context.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
         } finally {
             shownBox = oldBox;
             shownColour = oldColour;
@@ -1277,7 +1277,7 @@ public class StorageGuiTweaks extends Module {
              * nearest such size is used, never less than one screen pixel per pixel of art, and
              * the corner is put on a whole screen pixel so no row or column is split.
              */
-            float gui = (float) mc.getWindow().getScaleFactor();
+            float gui = (float) dev.jjstools.compat.Gui.scaleFactor();
             int perPixel = Math.max(1, Math.round(size * gui / 16.0F));
             int screenSize = perPixel * 16;
             drawn = screenSize / gui;
@@ -1294,11 +1294,11 @@ public class StorageGuiTweaks extends Module {
 
         float scale = drawn / 16.0F;
 
-        context.getMatrices().pushMatrix();
-        context.getMatrices().translate(left, top);
-        context.getMatrices().scale(scale, scale);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.translate(context, left, top);
+        dev.jjstools.compat.Gui.scale(context, scale, scale);
         context.drawItem(group.icon(), 0, 0);
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
     }
 
     private StorageSummary.Group chooseIcon(StorageSummary.Summary summary, String name) {

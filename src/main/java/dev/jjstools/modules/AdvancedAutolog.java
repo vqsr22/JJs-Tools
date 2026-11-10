@@ -30,7 +30,11 @@ import meteordevelopment.meteorclient.settings.*;
 import net.minecraft.component.DataComponentTypes;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.systems.modules.Modules;
+//#if MC >= 1.21.6
 import meteordevelopment.meteorclient.systems.modules.player.AntiAFK;
+//#else
+//$$ import meteordevelopment.meteorclient.systems.modules.movement.AntiAFK;
+//#endif
 import meteordevelopment.meteorclient.events.game.GameJoinedEvent;
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
 import meteordevelopment.meteorclient.events.game.ReceiveMessageEvent;

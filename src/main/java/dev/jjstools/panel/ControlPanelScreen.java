@@ -281,8 +281,8 @@ public class ControlPanelScreen extends Screen {
         }
         int mouseX = (int) (realX / gs);
         int mouseY = (int) (realY / gs);
-        context.getMatrices().pushMatrix();
-        context.getMatrices().scale(gs, gs);
+        dev.jjstools.compat.Gui.push(context);
+        dev.jjstools.compat.Gui.scale(context, gs, gs);
 
         // Anything being dragged inside a panel, such as a column edge, follows the mouse.
         if (ui.drag != null) ui.drag.move(mouseX, mouseY);
@@ -332,13 +332,12 @@ public class ControlPanelScreen extends Screen {
             float cx = p.x + p.w / 2F, cy = p.y + p.h / 2F;
             float s = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * k);
             float pull = (float) ((1 - k) * 0.15);
-            var m = context.getMatrices();
-            m.pushMatrix();
-            m.translate(cx + (p.tabX - cx) * pull, cy + (p.tabY - cy) * pull);
-            m.scale(s, s);
-            m.translate(-cx, -cy);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.translate(context, cx + (p.tabX - cx) * pull, cy + (p.tabY - cy) * pull);
+            dev.jjstools.compat.Gui.scale(context, s, s);
+            dev.jjstools.compat.Gui.translate(context, -cx, -cy);
             drawWindow(p);
-            m.popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
         }
 
         applyEditedSetting();
@@ -355,17 +354,16 @@ public class ControlPanelScreen extends Screen {
             } else {
                 float s = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * k);
                 float cx = vw / 2F, cy = vh / 2F, pull = (float) ((1 - k) * 0.15);
-                var m = context.getMatrices();
-                m.pushMatrix();
-                m.translate(cx + (settingsTabX - cx) * pull, cy + (settingsTabY - cy) * pull);
-                m.scale(s, s);
-                m.translate(-cx, -cy);
+                dev.jjstools.compat.Gui.push(context);
+                dev.jjstools.compat.Gui.translate(context, cx + (settingsTabX - cx) * pull, cy + (settingsTabY - cy) * pull);
+                dev.jjstools.compat.Gui.scale(context, s, s);
+                dev.jjstools.compat.Gui.translate(context, -cx, -cy);
                 drawSettings(prefs, theme);
-                m.popMatrix();
+                dev.jjstools.compat.Gui.pop(context);
             }
         }
 
-        context.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(context);
 
         // Tooltips are placed on the real screen, after the scaling is undone.
         ui.mx = realX;

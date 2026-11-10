@@ -67,18 +67,18 @@ public final class ShulkerScreenTint {
 
         if (split > 0) {
             if (colorized) {
-                context.drawTexture(RenderPipelines.GUI_TEXTURED, TintedTexture.ID, x, y,
+                context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, TintedTexture.ID, x, y,
                     0.0F, 0.0F, width, split, 256, 256);
             }
             else {
                 int tint = Colors.multiplyTint(rgb, StorageGuiTweaks.strength() / 100.0);
-                context.drawTexture(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y,
+                context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, TEXTURE, x, y,
                     0.0F, 0.0F, width, split, 256, 256, tint);
             }
         }
 
         if (split < height) {
-            context.drawTexture(RenderPipelines.GUI_TEXTURED, TEXTURE, x, y + split,
+            context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, TEXTURE, x, y + split,
                 0.0F, (float) split, width, height - split, 256, 256);
         }
 

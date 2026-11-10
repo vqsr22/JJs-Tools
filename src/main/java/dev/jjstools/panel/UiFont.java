@@ -10,7 +10,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.util.Identifier;
-import org.joml.Matrix3x2f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTTPackContext;
@@ -149,26 +148,24 @@ public final class UiFont {
          */
         public int draw(DrawContext ctx, TextRenderer tr, String s, int x, int y, float scale, int colour) {
             MinecraftClient mc = MinecraftClient.getInstance();
-            var matrices = ctx.getMatrices();
-            matrices.pushMatrix();
-            matrices.translate(x, y);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, x, y);
 
             // How many screen pixels one panel unit of text is, so the letters are baked for it exactly.
-            Matrix3x2f m = matrices;
-            float window = mc.getWindow().getScaleFactor();
-            float perUnit = Math.abs(m.m00) * window * scale;
+            float window = dev.jjstools.compat.Gui.scaleFactor();
+            float perUnit = Math.abs(dev.jjstools.compat.Gui.scaleX(ctx)) * window * scale;
             int px = Math.round(EM * perUnit);
             if (px < 5 || px > 160) {
-                matrices.popMatrix();
+                dev.jjstools.compat.Gui.pop(ctx);
                 fallback(ctx, tr, s, x, y, scale, colour);
                 return 1;
             }
 
             // Moves onto whole screen pixels, then works in screen pixels.
-            float ox = m.m20 * window, oy = m.m21 * window;
-            float toUnits = 1.0F / (Math.abs(m.m00) * window);
-            matrices.translate((Math.round(ox) - ox) * toUnits, (Math.round(oy) - oy) * toUnits);
-            matrices.scale(toUnits, toUnits);
+            float ox = dev.jjstools.compat.Gui.offsetX(ctx) * window, oy = dev.jjstools.compat.Gui.offsetY(ctx) * window;
+            float toUnits = 1.0F / (Math.abs(dev.jjstools.compat.Gui.scaleX(ctx)) * window);
+            dev.jjstools.compat.Gui.translate(ctx, (Math.round(ox) - ox) * toUnits, (Math.round(oy) - oy) * toUnits);
+            dev.jjstools.compat.Gui.scale(ctx, toUnits, toUnits);
 
             Atlas atlas = atlas(px);
             int baseline = Math.round(BASELINE * perUnit);
@@ -178,12 +175,12 @@ public final class UiFont {
                 char c = s.charAt(i);
                 if (!has(c)) {
                     // A character the font has not got, such as an arrow, in Minecraft's font.
-                    matrices.pushMatrix();
-                    matrices.translate(Math.round(pen), 0);
-                    matrices.scale(perUnit, perUnit);
+                    dev.jjstools.compat.Gui.push(ctx);
+                    dev.jjstools.compat.Gui.translate(ctx, Math.round(pen), 0);
+                    dev.jjstools.compat.Gui.scale(ctx, perUnit, perUnit);
                     ctx.drawText(tr, String.valueOf(c), 0, 0, colour, false);
                     drawn++;
-                    matrices.popMatrix();
+                    dev.jjstools.compat.Gui.pop(ctx);
                     pen += tr.getWidth(String.valueOf(c)) * perUnit;
                     continue;
                 }
@@ -193,13 +190,13 @@ public final class UiFont {
                     if (w > 0 && h > 0) {
                         int gx = Math.round(pen + g.xoff());
                         int gy = baseline + Math.round(g.yoff());
-                        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, atlas.id, gx, gy, g.x0(), g.y0(), w, h, w, h, atlas.size, atlas.size, colour);
+                        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, atlas.id, gx, gy, g.x0(), g.y0(), w, h, w, h, atlas.size, atlas.size, colour);
                         drawn++;
                     }
                 }
                 pen += advance(c) * perUnit;
             }
-            matrices.popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
             return drawn;
         }
 
@@ -363,10 +360,10 @@ public final class UiFont {
     }
 
     private static void fallback(DrawContext ctx, TextRenderer tr, String s, int x, int y, float scale, int colour) {
-        ctx.getMatrices().pushMatrix();
-        ctx.getMatrices().translate(x, y);
-        ctx.getMatrices().scale(scale, scale);
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.translate(ctx, x, y);
+        dev.jjstools.compat.Gui.scale(ctx, scale, scale);
         ctx.drawText(tr, s, 0, 0, colour, false);
-        ctx.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(ctx);
     }
 }

@@ -93,7 +93,11 @@ public class JJUtil {
                 Instant.now(),
                 NetworkEncryptionUtils.SecureRandomUtil.nextLong(),
                 null,
+                //#if MC >= 1.21.6
                 ((ClientPlayNetworkHandlerAccessor) mc.getNetworkHandler()).meteor$getLastSeenMessagesCollector().collect().update()
+                //#else
+                //$$ ((ClientPlayNetworkHandlerAccessor) mc.getNetworkHandler()).getLastSeenMessagesCollector().collect().update()
+                //#endif
             );
             case Interact -> illegalPacket = PlayerInteractEntityC2SPacket.interact(mc.player, false, Hand.MAIN_HAND);
             case Movement -> illegalPacket = new PlayerMoveC2SPacket.PositionAndOnGround(Double.NaN, 69, Double.NaN, false, false);

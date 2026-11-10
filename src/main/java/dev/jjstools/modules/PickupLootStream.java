@@ -376,11 +376,11 @@ public class PickupLootStream extends Module {
             if (slides) x += (right ? 1 : -1) * (1.0 - shown) * slideDistance.get();
             float alpha = fades ? (float) Math.max(0.0, Math.min(1.0, shown)) : 1.0F;
 
-            context.getMatrices().pushMatrix();
-            context.getMatrices().scale(s, s);
-            context.getMatrices().translate((float) x, (float) y);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.scale(context, s, s);
+            dev.jjstools.compat.Gui.translate(context, (float) x, (float) y);
             drawRow(context, tr, row, layout, alpha, right, now);
-            context.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
         }
     }
 
@@ -468,11 +468,11 @@ public class PickupLootStream extends Module {
         // Items cannot be drawn see-through, so in a fade the icon comes in once the row is half there.
         if (icon > 0 && alpha >= 0.5F) {
             float k = (float) (icon / 16.0);
-            context.getMatrices().pushMatrix();
-            context.getMatrices().translate((float) iconX, (float) ((h - icon) / 2.0));
-            context.getMatrices().scale(k, k);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.translate(context, (float) iconX, (float) ((h - icon) / 2.0));
+            dev.jjstools.compat.Gui.scale(context, k, k);
             context.drawItem(row.stack, 0, 0);
-            context.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
         }
 
         // The text renderer treats a nearly invisible colour as solid, so very faint text is skipped.
@@ -520,11 +520,11 @@ public class PickupLootStream extends Module {
 
             // A pulsing count grows about its own middle, so the rest of the row stays put.
             double grow = (k - ts) * tr.getWidth(text);
-            context.getMatrices().pushMatrix();
-            context.getMatrices().translate((float) (cursor - grow / 2.0), (float) (textY - (k - ts) * tr.fontHeight / 2.0));
-            context.getMatrices().scale((float) k, (float) k);
+            dev.jjstools.compat.Gui.push(context);
+            dev.jjstools.compat.Gui.translate(context, (float) (cursor - grow / 2.0), (float) (textY - (k - ts) * tr.fontHeight / 2.0));
+            dev.jjstools.compat.Gui.scale(context, (float) k, (float) k);
             context.drawText(tr, text, 0, 0, colours.get(i), shadow.get());
-            context.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(context);
 
             cursor += partW + gap.get();
         }

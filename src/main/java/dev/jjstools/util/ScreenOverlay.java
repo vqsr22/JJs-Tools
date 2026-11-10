@@ -34,6 +34,7 @@ public final class ScreenOverlay {
         dev.jjstools.modules.StorageGuiTweaks tweaks = modules.get(dev.jjstools.modules.StorageGuiTweaks.class);
         // Only touched at all while the preview is showing.
         if (tweaks != null && tweaks.isActive() && tweaks.updatePreview()) {
+            //#if MC >= 1.21.6
             var access = (dev.jjstools.mixin.GameRendererAccessor) mc.gameRenderer;
             var state = access.jjstools$getGuiState();
             state.clear();
@@ -63,6 +64,19 @@ public final class ScreenOverlay {
             } finally {
                 mc.currentScreen = screen;
             }
+            //#else
+            //$$ // Before 1.21.6 the GUI draws straight to the screen, so the preview is drawn and
+            //$$ // flushed at once, with Exordium told a screen is open as above.
+            //$$ var screen = mc.currentScreen;
+            //$$ mc.currentScreen = STAND_IN;
+            //$$ try {
+            //$$     var context = new net.minecraft.client.gui.DrawContext(mc, mc.getBufferBuilders().getEntityVertexConsumers());
+            //$$     tweaks.drawPreview(context, context.getScaledWindowWidth());
+            //$$     context.draw();
+            //$$ } finally {
+            //$$     mc.currentScreen = screen;
+            //$$ }
+            //#endif
         }
 
         Incognito incognito = modules.get(Incognito.class);

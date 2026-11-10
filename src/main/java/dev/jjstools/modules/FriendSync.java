@@ -90,7 +90,12 @@ public class FriendSync extends Module {
         }
         String next = queue.poll();
         if (next == null) return;
+        //#if MC >= 1.21.6
         ChatUtils.sendPlayerMsg(next, false);
+        //#else
+        //$$ // Older Meteor always adds to the chat history.
+        //$$ ChatUtils.sendPlayerMsg(next);
+        //#endif
         wait = delay.get();
     }
 

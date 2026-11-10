@@ -93,8 +93,8 @@ public abstract class PeekScreenMixin extends ShulkerBoxScreen {
     @Unique
     private void jjsTools$drawEnderChest(DrawContext context) {
         int top = 17 + 3 * 18;
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, CHEST_TEXTURE, x, y, 0.0F, 0.0F, backgroundWidth, top, 256, 256);
-        context.drawTexture(RenderPipelines.GUI_TEXTURED, CHEST_TEXTURE, x, y + top, 0.0F, 127.0F,
+        context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, CHEST_TEXTURE, x, y, 0.0F, 0.0F, backgroundWidth, top, 256, 256);
+        context.drawTexture(dev.jjstools.compat.Gui.TEXTURED, CHEST_TEXTURE, x, y + top, 0.0F, 127.0F,
             backgroundWidth, backgroundHeight - top, 256, 256);
     }
 

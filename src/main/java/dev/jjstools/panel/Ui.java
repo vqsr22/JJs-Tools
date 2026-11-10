@@ -467,11 +467,11 @@ public final class Ui {
             ctx.drawText(tr, s, x, y, colour, false);
             return;
         }
-        ctx.getMatrices().pushMatrix();
-        ctx.getMatrices().translate(x, y);
-        ctx.getMatrices().scale(scale, scale);
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.translate(ctx, x, y);
+        dev.jjstools.compat.Gui.scale(ctx, scale, scale);
         ctx.drawText(tr, s, 0, 0, colour, false);
-        ctx.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(ctx);
     }
 
     public void textRight(String s, int right, int y, int colour) {
@@ -615,7 +615,7 @@ public final class Ui {
     public void added(int n) {
         drawnInLayer += n;
         if (drawnInLayer >= PER_LAYER) {
-            ctx.createNewRootLayer();
+            dev.jjstools.compat.Gui.newLayer(ctx);
             drawnInLayer = 0;
         }
     }
@@ -693,26 +693,26 @@ public final class Ui {
 
     /** Works out where a rectangle falls in screen pixels, and draws in those for a moment. */
     private void inPixels(int x, int y, int w, int h, Pixels draw) {
-        var m = ctx.getMatrices();
-        float sf = mc.getWindow().getScaleFactor();
-        int x1 = Math.round((m.m00 * x + m.m20) * sf);
-        int y1 = Math.round((m.m11 * y + m.m21) * sf);
-        int x2 = Math.round((m.m00 * (x + w) + m.m20) * sf);
-        int y2 = Math.round((m.m11 * (y + h) + m.m21) * sf);
+        float sf = dev.jjstools.compat.Gui.scaleFactor();
+        float sx = dev.jjstools.compat.Gui.scaleX(ctx), sy = dev.jjstools.compat.Gui.scaleY(ctx), ox = dev.jjstools.compat.Gui.offsetX(ctx), oy = dev.jjstools.compat.Gui.offsetY(ctx);
+        int x1 = Math.round((sx * x + ox) * sf);
+        int y1 = Math.round((sy * y + oy) * sf);
+        int x2 = Math.round((sx * (x + w) + ox) * sf);
+        int y2 = Math.round((sy * (y + h) + oy) * sf);
         if (x2 <= x1 || y2 <= y1) return;
-        m.pushMatrix();
-        m.identity();
-        m.scale(1F / sf, 1F / sf);
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.identity(ctx);
+        dev.jjstools.compat.Gui.scale(ctx, 1F / sf, 1F / sf);
         try {
             draw.draw(x1, y1, x2 - x1, y2 - y1);
         } finally {
-            m.popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
         }
     }
 
     /** How many screen pixels one unit is here. */
     private float pixelsPerUnit() {
-        return Math.abs(ctx.getMatrices().m00) * mc.getWindow().getScaleFactor();
+        return Math.abs(dev.jjstools.compat.Gui.scaleX(ctx)) * dev.jjstools.compat.Gui.scaleFactor();
     }
 
     /** A rectangle with round corners of radius r. */
@@ -756,10 +756,10 @@ public final class Ui {
         ctx.fill(px, py + rr, px + rr, py + ph - rr, argb);
         ctx.fill(px + pw - rr, py + rr, px + pw, py + ph - rr, argb);
         UiShapes.Shape c = UiShapes.circle(rr);
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py, 0, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py, rr, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px, py + ph - rr, 0, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
-        ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), px + pw - rr, py + ph - rr, rr, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), px, py, 0, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), px + pw - rr, py, rr, 0, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), px, py + ph - rr, 0, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
+        ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, c.id(), px + pw - rr, py + ph - rr, rr, rr, rr, rr, rr, rr, c.w(), c.h(), argb);
     }
 
     private void shape(java.util.function.BiFunction<Integer, Integer, UiShapes.Shape> make, int x, int y, int w, int h, int argb) {
@@ -767,7 +767,7 @@ public final class Ui {
         inPixels(x, y, w, h, (px, py, pw, ph) -> {
             added(1);
             UiShapes.Shape s = make.apply(pw, ph);
-            ctx.drawTexture(RenderPipelines.GUI_TEXTURED, s.id(), px, py, 0, 0, pw, ph, pw, ph, s.w(), s.h(), argb);
+            ctx.drawTexture(dev.jjstools.compat.Gui.TEXTURED, s.id(), px, py, 0, 0, pw, ph, pw, ph, s.w(), s.h(), argb);
         });
     }
 
@@ -799,11 +799,11 @@ public final class Ui {
             item(stack, x, y);
             return;
         }
-        ctx.getMatrices().pushMatrix();
-        ctx.getMatrices().translate(x, y);
-        ctx.getMatrices().scale(size / 16F, size / 16F);
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.translate(ctx, x, y);
+        dev.jjstools.compat.Gui.scale(ctx, size / 16F, size / 16F);
         ctx.drawItem(stack, 0, 0);
-        ctx.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(ctx);
         added(1);
     }
 
@@ -816,16 +816,16 @@ public final class Ui {
         boolean custom = customFont && UiFont.handles(count);
         float raw = custom ? UiFont.width(tr, count) : tr.getWidth(count);
         int w = Math.round(raw * s);
-        ctx.getMatrices().pushMatrix();
-        ctx.getMatrices().translate(x + 17 - w, y + 17 - Math.round(8 * s));
-        ctx.getMatrices().scale(s, s);
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.translate(ctx, x + 17 - w, y + 17 - Math.round(8 * s));
+        dev.jjstools.compat.Gui.scale(ctx, s, s);
         if (custom) {
             added(UiFont.draw(ctx, tr, count, 0, 0, 1F, 0xFFFFFFFF));
         } else {
             ctx.drawTextWithShadow(tr, count, 0, 0, 0xFFFFFFFF);
             added(1);
         }
-        ctx.getMatrices().popMatrix();
+        dev.jjstools.compat.Gui.pop(ctx);
     }
 
     /** Whether a player is on the server now, going by the player list. */
@@ -988,13 +988,12 @@ public final class Ui {
             round(x, y, w, h, 3, colour);
             return;
         }
-        var m = ctx.getMatrices();
-        m.pushMatrix();
-        m.translate(x + w / 2F, y + h / 2F);
-        m.scale((float) k, (float) k);
-        m.translate(-(x + w / 2F), -(y + h / 2F));
+        dev.jjstools.compat.Gui.push(ctx);
+        dev.jjstools.compat.Gui.translate(ctx, x + w / 2F, y + h / 2F);
+        dev.jjstools.compat.Gui.scale(ctx, (float) k, (float) k);
+        dev.jjstools.compat.Gui.translate(ctx, -(x + w / 2F), -(y + h / 2F));
         round(x, y, w, h, 3, colour);
-        m.popMatrix();
+        dev.jjstools.compat.Gui.pop(ctx);
     }
 
     /** Blends two colours, transparency included. */
@@ -1041,11 +1040,11 @@ public final class Ui {
             added(face.draw(ctx, tr, label, tx, ty, scale, c[1]));
         } else {
             added(1);
-            ctx.getMatrices().pushMatrix();
-            ctx.getMatrices().translate(tx, ty);
-            ctx.getMatrices().scale(scale, scale);
+            dev.jjstools.compat.Gui.push(ctx);
+            dev.jjstools.compat.Gui.translate(ctx, tx, ty);
+            dev.jjstools.compat.Gui.scale(ctx, scale, scale);
             ctx.drawText(tr, label, 0, 0, c[1], false);
-            ctx.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
         }
         if (action != null) onClick(x, y, w, h, action);
         return c[2] == 1;

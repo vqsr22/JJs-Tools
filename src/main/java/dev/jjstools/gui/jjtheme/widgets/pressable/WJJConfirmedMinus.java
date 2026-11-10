@@ -5,6 +5,9 @@
 
 package dev.jjstools.gui.jjtheme.widgets.pressable;
 
+// Meteor only has confirmed buttons from its 1.21.6 builds on.
+//#if MC >= 1.21.6
+
 import meteordevelopment.meteorclient.gui.renderer.GuiRenderer;
 import dev.jjstools.gui.jjtheme.JJGuiTheme;
 import dev.jjstools.gui.jjtheme.JJWidget;
@@ -26,3 +29,4 @@ public class WJJConfirmedMinus extends WConfirmedMinus implements JJWidget {
         renderer.quad(x + pad, y + height / 2 - s / 2, width - pad * 2, s, fg);
     }
 }
+//#endif

@@ -101,7 +101,7 @@ public class Incognito extends Module {
     public void drawCovers() {
         if (!coordsOn.get() && !mapOn.get()) return;
         // Positions are in GUI pixels; this renderer works in screen pixels.
-        double k = mc.getWindow().getScaleFactor();
+        double k = dev.jjstools.compat.Gui.scaleFactor();
         Renderer2D r = Renderer2D.COLOR;
         r.begin();
         if (coordsOn.get()) draw(r, k, coordsShape.get(), coordsX.get(), coordsY.get(), coordsW.get(), coordsH.get(), coordsColour.get());

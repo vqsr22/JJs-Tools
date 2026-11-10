@@ -642,20 +642,24 @@ public class JJGuiTheme extends GuiTheme {
         return w(new WJJButton(text, texture));
     }
 
+    //#if MC >= 1.21.6
     @Override
     protected WConfirmedButton confirmedButton(String text, String confirmText, GuiTexture texture) {
         return w(new WJJConfirmedButton(text, confirmText, texture));
     }
+    //#endif
 
     @Override
     public WMinus minus() {
         return w(new WJJMinus());
     }
 
+    //#if MC >= 1.21.6
     @Override
     public WConfirmedMinus confirmedMinus() {
         return w(new WJJConfirmedMinus());
     }
+    //#endif
 
     @Override
     public WPlus plus() {

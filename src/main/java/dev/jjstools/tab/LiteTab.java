@@ -205,13 +205,13 @@ public final class LiteTab {
         queued = false;
 
         // Everything below is drawn in local coordinates, (0, 0) = top-left of the box.
-        ctx.getMatrices().pushMatrix();
+        dev.jjstools.compat.Gui.push(ctx);
         try {
-            ctx.getMatrices().translate(originX, originY);
-            ctx.getMatrices().scale(drawScale, drawScale);
+            dev.jjstools.compat.Gui.translate(ctx, originX, originY);
+            dev.jjstools.compat.Gui.scale(ctx, drawScale, drawScale);
             draw(hud, ctx, tr, module, heads, shadow, meteorText, meteorHeader, maxAge);
         } finally {
-            ctx.getMatrices().popMatrix();
+            dev.jjstools.compat.Gui.pop(ctx);
         }
 
         if (meteorText) {
@@ -311,10 +311,10 @@ public final class LiteTab {
         ctx.fill(x + r, y, x + w - r, y + h, argb);
         ctx.fill(x, y + r, x + r, y + h - r, argb);
         ctx.fill(x + w - r, y + r, x + w, y + h - r, argb);
-        double perUnit = MinecraftClient.getInstance().getWindow().getScaleFactor() * drawScale;
+        double perUnit = dev.jjstools.compat.Gui.scaleFactor() * drawScale;
         int rp = Math.max(1, (int) Math.round(r * perUnit));
         var c = dev.jjstools.panel.UiShapes.circle(rp);
-        var pipe = net.minecraft.client.gl.RenderPipelines.GUI_TEXTURED;
+        var pipe = dev.jjstools.compat.Gui.TEXTURED;
         ctx.drawTexture(pipe, c.id(), x, y, 0, 0, r, r, rp, rp, c.w(), c.h(), argb);
         ctx.drawTexture(pipe, c.id(), x + w - r, y, rp, 0, r, r, rp, rp, c.w(), c.h(), argb);
         ctx.drawTexture(pipe, c.id(), x, y + h - r, 0, rp, r, r, rp, rp, c.w(), c.h(), argb);
@@ -390,7 +390,7 @@ public final class LiteTab {
 
     private static void drawLines() {
         MinecraftClient mc = MinecraftClient.getInstance();
-        double gs = mc.getWindow().getScaleFactor();
+        double gs = dev.jjstools.compat.Gui.scaleFactor();
         double s = drawScale;
 
         meteordevelopment.meteorclient.renderer.text.TextRenderer text = meteordevelopment.meteorclient.renderer.text.TextRenderer.get();
