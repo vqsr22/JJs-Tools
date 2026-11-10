@@ -47,7 +47,7 @@ public class ControlPanel extends Module {
 
     private final Setting<Double> animationSpeed = sgLook.add(new DoubleSetting.Builder()
         .name("animation-speed")
-        .description("How fast windows, buttons, dropdowns, module lists and the module wheel animate, in JJ's theme and the Control Panel. 1 is normal, 2 twice as fast, 0 no animation at all.")
+        .description("How fast windows, buttons, dropdowns and module lists animate, in JJ's theme and the Control Panel. 1 is normal, 2 twice as fast, 0 no animation at all.")
         .defaultValue(1.0).min(0).max(3).sliderRange(0, 3)
         .build()
     );

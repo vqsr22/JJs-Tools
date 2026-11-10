@@ -347,12 +347,23 @@ public class JJGuiTheme extends GuiTheme {
     }
 
     /**
-     * Picks JJ's theme every time the game starts. Meteor puts back whichever theme was last used
-     * in its own start-up step; this runs after it, as Meteor runs its own steps before any addon's.
+     * Makes JJ's theme the default: picks it the first time the game starts with JJ's Tools, and
+     * notes that it has, in a small file. After that Meteor puts back whichever theme was last
+     * used, so someone who switches back to Meteor's theme keeps it. This runs after Meteor's own
+     * start-up step, as Meteor runs its own steps before any addon's.
      */
     @meteordevelopment.meteorclient.utils.PostInit
     public static void selectOnBoot() {
-        if (instance != null) meteordevelopment.meteorclient.gui.GuiThemes.select(NAME);
+        if (instance == null) return;
+        java.io.File marker = new java.io.File(meteordevelopment.meteorclient.MeteorClient.FOLDER, "jjs-tools/default-theme-set");
+        if (marker.exists()) return;
+        meteordevelopment.meteorclient.gui.GuiThemes.select(NAME);
+        try {
+            marker.getParentFile().mkdirs();
+            marker.createNewFile();
+        } catch (java.io.IOException ignored) {
+            // Not written: JJ's theme is picked again next start, as before.
+        }
     }
 
     // Auto fit
