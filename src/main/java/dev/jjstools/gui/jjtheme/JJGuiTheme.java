@@ -463,8 +463,7 @@ public class JJGuiTheme extends GuiTheme {
         // Every column too long for the screen ends the same distance from the bottom as the
         // columns are from the sides, scrolling the rest, rather than some running off the
         // bottom and some stopping short. In a stack only the lowest one is fitted.
-        root.calculateSize();
-        root.calculateWidgetPositions();
+        layOut(root);
         List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> columns = new java.util.ArrayList<>();
         collectColumns(root, columns);
         java.util.Set<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> hasBelow = new java.util.HashSet<>();
@@ -482,11 +481,24 @@ public class JJGuiTheme extends GuiTheme {
         screen.invalidate();
     }
 
+    /**
+     * Lays the screen out, twice. Meteor places each column using the width that column had in
+     * the layout before, so straight after a change of scale the first pass wraps the row as if
+     * the columns were still their old size. Trying a big scale first then made every smaller
+     * one look like it wrapped too, and auto fit fell all the way to its smallest scale whenever
+     * the columns did not fit at full size. The second pass places them at their real widths.
+     */
+    private static void layOut(meteordevelopment.meteorclient.gui.widgets.containers.WContainer root) {
+        for (int i = 0; i < 2; i++) {
+            root.calculateSize();
+            root.calculateWidgetPositions();
+        }
+    }
+
     /** Lays the screen out with the module columns at a trial scale and says whether the row fits. */
     private boolean fits(meteordevelopment.meteorclient.gui.widgets.containers.WContainer root, double trial) {
         trialScale = trial;
-        root.calculateSize();
-        root.calculateWidgetPositions();
+        layOut(root);
 
         List<meteordevelopment.meteorclient.gui.widgets.containers.WWindow> columns = new java.util.ArrayList<>();
         collectColumns(root, columns);
