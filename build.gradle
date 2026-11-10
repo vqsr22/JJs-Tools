@@ -2,11 +2,31 @@ plugins {
 	id 'fabric-loom' version '1.14-SNAPSHOT'
 }
 
-version = "${project.mod_version}+${project.minecraft_version}"
+// One codebase, several Minecraft versions. Pick one with -Pminecraft_version=1.21.4 (the default
+// is set in gradle.properties). The mappings and Meteor build for it come from
+// versions/<version>.properties, and any code that only fits that version from src/mc/<version>.
+def mcVersion = project.minecraft_version
+def versionFile = file("versions/${mcVersion}.properties")
+if (!versionFile.exists()) {
+	def known = file('versions').listFiles().findAll { it.name.endsWith('.properties') }.collect { it.name - '.properties' }.sort()
+	throw new GradleException("Minecraft ${mcVersion} is not supported. Pick one of: ${known.join(', ')}")
+}
+def versionProps = new Properties()
+versionFile.withInputStream { versionProps.load(it) }
+versionProps.each { k, v -> project.ext.set(k, v) }
+
+version = "${project.mod_version}+${mcVersion}"
 group = project.maven_group
 
 base {
 	archivesName = project.archives_base_name
+}
+
+sourceSets {
+	main {
+		java.srcDirs += "src/mc/${mcVersion}/java"
+		resources.srcDirs += "src/mc/${mcVersion}/resources"
+	}
 }
 
 repositories {
@@ -37,8 +57,9 @@ dependencies {
 
 processResources {
 	inputs.property 'version', project.version
+	inputs.property 'minecraft_version', mcVersion
 	filesMatching('fabric.mod.json') {
-		expand 'version': project.version
+		expand 'version': project.version, 'minecraft_version': mcVersion
 	}
 }
 
