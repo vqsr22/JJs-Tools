@@ -94,6 +94,26 @@ public class ModuleWheel extends Module {
         .build()
     );
 
+    private final Setting<Integer> animationTime = sgGeneral.add(new IntSetting.Builder()
+        .name("animation-time")
+        .description("How long the wheel takes to open, in milliseconds. 0 turns the animation off.")
+        .defaultValue(90)
+        .min(0)
+        .sliderRange(0, 500)
+        .build()
+    );
+
+    /** How far an animation that began at startMs is, 0 to 1, over the wheel's animation time; 1 straight away at 0. */
+    private double progress(double startMs, double scale) {
+        double ms = animationTime.get() * scale;
+        if (ms <= 0) return 1;
+        return dev.jjstools.util.Motion.clamp01((dev.jjstools.util.Motion.now() - startMs) / ms);
+    }
+
+    private boolean animated() {
+        return animationTime.get() > 0;
+    }
+
     private int commandLines = -1;
 
     /**
@@ -249,6 +269,16 @@ public class ModuleWheel extends Module {
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
+        checkKey();
+    }
+
+    /** Checked every frame as well as every tick, so the wheel opens the moment the key goes down rather than on the next tick. */
+    @EventHandler
+    private void onRender2D(meteordevelopment.meteorclient.events.render.Render2DEvent event) {
+        checkKey();
+    }
+
+    private void checkKey() {
         boolean down = wheelKey.get().isSet() && wheelKey.get().isPressed();
         if (down && !wasDown && mc.currentScreen == null && !slots().isEmpty()) {
             mc.setScreen(new WheelScreen());
@@ -296,8 +326,15 @@ public class ModuleWheel extends Module {
 
         @Override
         public void tick() {
-            // Let go of the key: choose whatever is under the mouse and close. Mid-move it just
-            // closes, keeping the new order.
+            checkRelease();
+        }
+
+        /**
+         * Let go of the key: choose whatever is under the mouse and close. Mid-move it just
+         * closes, keeping the new order. Checked every frame, so there is no wait for a tick.
+         */
+        private void checkRelease() {
+            if (done) return;
             if (!wheelKey.get().isPressed()) {
                 if (dragging != null) {
                     finish(null);
@@ -375,23 +412,25 @@ public class ModuleWheel extends Module {
             closingAt = dev.jjstools.util.Motion.now();
             if (chosen != null) {
                 pulsed = chosen;
-                dev.jjstools.util.Motion.pulse(chosen);
+                if (animated()) dev.jjstools.util.Motion.pulse(chosen);
             }
         }
 
         @Override
         public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
             super.render(ctx, mouseX, mouseY, delta);
-            // Shrinking away after a choice: closed once that is over.
+            checkRelease();
+            // Shrinking away after a choice: closed once that is over. With no animation time
+            // it closes at once.
             double whole;
             if (closingAt >= 0) {
-                whole = dev.jjstools.util.Motion.exit(closingAt);
+                whole = 1 - dev.jjstools.util.Motion.easeIn(progress(closingAt, 0.8));
                 if (whole <= 0) {
                     close();
                     return;
                 }
             } else {
-                whole = dev.jjstools.util.Motion.enter(openedAt, 0);
+                whole = dev.jjstools.util.Motion.easeOut(progress(openedAt, 1));
             }
             if (palette == null) palette = Ui.palette(Ui.currentTheme());
             int panel = palette[0], well = palette[1], accent = palette[3], text = palette[4];
@@ -418,15 +457,14 @@ public class ModuleWheel extends Module {
             double labelR = (safe + r) / 2.0;
 
             // Each slot moves round the wheel on an arc, the shorter way, easing in and out, rather
-            // than jumping. On opening they sweep out from the middle one after another. The one
+            // than jumping. On opening they all sweep out from the middle together, with no wait. The one
             // being moved sits exactly under the cursor while held, with no easing to lag it.
             double now = dev.jjstools.util.Motion.now();
             for (int i = 0; i < list.size(); i++) {
                 Slot m = list.get(i);
                 double slot = i * step - 90;
                 // angle, distance, from angle, from distance, start time, target angle, delay, coming in
-                double[] p = shown.computeIfAbsent(m, x -> new double[] { slot - 25, safe, slot - 25, safe, openedAt, slot,
-                    Math.min(shown.size(), 12) * dev.jjstools.util.Motion.STAGGER_MS, 1 });
+                double[] p = shown.computeIfAbsent(m, x -> new double[] { slot - 15, safe, slot - 15, safe, openedAt, slot, 0, 1 });
                 if (m == dragging) {
                     p[0] = Math.toDegrees(Math.atan2(mouseY - cy, mouseX - cx));
                     p[1] = Math.hypot(mouseX - cx, mouseY - cy);
@@ -441,7 +479,7 @@ public class ModuleWheel extends Module {
                     p[6] = 0;
                     p[7] = 0;
                 }
-                double e = p[7] == 1 ? dev.jjstools.util.Motion.enter(p[4], p[6]) : dev.jjstools.util.Motion.move(p[4], p[6]);
+                double e = p[7] == 1 ? dev.jjstools.util.Motion.easeOut(progress(p[4], 1)) : dev.jjstools.util.Motion.easeInOut(progress(p[4], 1));
                 double diff = ((slot - p[2]) % 360 + 540) % 360 - 180;
                 p[0] = p[2] + diff * e;
                 p[1] = p[3] + (labelR - p[3]) * e;
