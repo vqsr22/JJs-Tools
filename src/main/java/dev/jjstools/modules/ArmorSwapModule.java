@@ -343,7 +343,7 @@ public abstract class ArmorSwapModule extends Module {
             mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
             InvUtils.swapBack();
         } else {
-            int selected = mc.player.getInventory().getSelectedSlot();
+            int selected = dev.jjstools.compat.Compat.selectedSlot(mc.player.getInventory());
             InvUtils.quickSwap().fromId(selected).to(slot);
             mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
             InvUtils.quickSwap().fromId(selected).to(slot);

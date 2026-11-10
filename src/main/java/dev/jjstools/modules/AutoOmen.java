@@ -302,7 +302,7 @@ public class AutoOmen extends Module {
         ItemStack stack = slot == SlotUtils.OFFHAND ? mc.player.getOffHandStack() : mc.player.getInventory().getStack(slot);
         int level = amplifier(stack) + 1;
 
-        heldSlot = mc.player.getInventory().getSelectedSlot();
+        heldSlot = dev.jjstools.compat.Compat.selectedSlot(mc.player.getInventory());
         if (slot != heldSlot) {
             // Slot-swap click: the bottle stack and your held item trade places.
             // Your selected hotbar slot does not change.
@@ -332,7 +332,7 @@ public class AutoOmen extends Module {
 
     /** Inventory index of the bottle to drink, or -1. */
     private int findBottle() {
-        int selected = mc.player.getInventory().getSelectedSlot();
+        int selected = dev.jjstools.compat.Compat.selectedSlot(mc.player.getInventory());
         int end = searchInventory.get() ? SlotUtils.MAIN_END : SlotUtils.HOTBAR_END;
 
         int best = -1;

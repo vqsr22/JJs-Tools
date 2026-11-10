@@ -3,7 +3,9 @@ package dev.jjstools.mixin;
 import dev.jjstools.modules.ViaEnchantFix;
 import dev.jjstools.util.VanillaEnchants;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
+//#if MC >= 1.21.5
 import net.minecraft.component.ComponentsAccess;
+//#endif
 import net.minecraft.component.type.ItemEnchantmentsComponent;
 import net.minecraft.enchantment.Enchantment;
 import net.minecraft.item.Item;
@@ -29,7 +31,11 @@ import java.util.function.Consumer;
 public abstract class ItemEnchantmentsComponentMixin {
     @Inject(method = "appendTooltip", at = @At("HEAD"), cancellable = true)
     private void jjstools$vanillaOrder(Item.TooltipContext context, Consumer<Text> textConsumer,
+                                       //#if MC >= 1.21.5
                                        TooltipType type, ComponentsAccess components, CallbackInfo ci) {
+                                       //#else
+                                       //$$ TooltipType type, CallbackInfo ci) {
+                                       //#endif
         if (!ViaEnchantFix.shouldFixOrder()) return;
 
         ItemEnchantmentsComponent self = (ItemEnchantmentsComponent) (Object) this;

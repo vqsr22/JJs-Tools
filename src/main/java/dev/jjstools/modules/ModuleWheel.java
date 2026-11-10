@@ -11,7 +11,6 @@ import meteordevelopment.meteorclient.utils.misc.Keybind;
 import meteordevelopment.orbit.EventHandler;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
 //#if MC >= 1.21.9
 import net.minecraft.client.gui.Click;
 //#endif
@@ -246,9 +245,9 @@ public class ModuleWheel extends Module {
     public Module fromTag(net.minecraft.nbt.NbtCompound tag) {
         super.fromTag(tag);
         icons.clear();
-        net.minecraft.nbt.NbtCompound saved = tag.getCompoundOrEmpty("wheel-icons");
+        net.minecraft.nbt.NbtCompound saved = dev.jjstools.compat.Compat.nbtCompound(tag, "wheel-icons");
         for (String key : saved.getKeys()) {
-            String value = saved.getString(key, "");
+            String value = dev.jjstools.compat.Compat.nbtString(saved, key, "");
             int bar = value.lastIndexOf('|');
             String itemId = bar >= 0 ? value.substring(0, bar) : value;
             boolean glint = bar >= 0 && Boolean.parseBoolean(value.substring(bar + 1));
@@ -257,10 +256,10 @@ public class ModuleWheel extends Module {
             icons.put(key, new Icon(net.minecraft.registry.Registries.ITEM.get(id), glint));
         }
         names.clear();
-        net.minecraft.nbt.NbtCompound savedNames = tag.getCompoundOrEmpty("wheel-names");
-        for (String key : savedNames.getKeys()) names.put(key, savedNames.getString(key, ""));
+        net.minecraft.nbt.NbtCompound savedNames = dev.jjstools.compat.Compat.nbtCompound(tag, "wheel-names");
+        for (String key : savedNames.getKeys()) names.put(key, dev.jjstools.compat.Compat.nbtString(savedNames, key, ""));
         order.clear();
-        String savedOrder = tag.getString("wheel-order", "");
+        String savedOrder = dev.jjstools.compat.Compat.nbtString(tag, "wheel-order", "");
         if (!savedOrder.isEmpty()) order.addAll(List.of(savedOrder.split("\n")));
         return this;
     }
@@ -423,7 +422,7 @@ public class ModuleWheel extends Module {
 
         private int hoveredNow() {
             MinecraftClient c = MinecraftClient.getInstance();
-            return hovered(c.mouse.getScaledX(c.getWindow()), c.mouse.getScaledY(c.getWindow()));
+            return hovered(dev.jjstools.compat.Compat.mouseX(), dev.jjstools.compat.Compat.mouseY());
         }
 
         private void choose(int index) {

@@ -1018,7 +1018,7 @@ public class PrinterGoBrrr extends Module {
             if (nearEnough(pos)) wanted.add(schematic.getBlockState(pos).getBlock().asItem());
         }
 
-        int selected = mc.player.getInventory().getSelectedSlot();
+        int selected = dev.jjstools.compat.Compat.selectedSlot(mc.player.getInventory());
         int best = -1;
         int bestScore = Integer.MIN_VALUE;
         for (int slot = 9 - swapSlots.get(); slot < 9; slot++) {

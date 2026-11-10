@@ -51,7 +51,7 @@ public final class TintedTexture {
                 if (registered) tm.destroyTexture(ID);
                 registered = true;
             }
-            NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "jjs-tools tinted shulker box", image);
+            NativeImageBackedTexture texture = dev.jjstools.compat.Compat.texture(() -> "jjs-tools tinted shulker box", image);
             texture.upload();
             tm.registerTexture(target, texture);
             return true;

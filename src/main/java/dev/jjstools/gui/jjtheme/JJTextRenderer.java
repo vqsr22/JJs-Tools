@@ -2,9 +2,18 @@ package dev.jjstools.gui.jjtheme;
 
 import dev.jjstools.JJsTools;
 import meteordevelopment.meteorclient.renderer.Fonts;
+//#if MC >= 1.21.5
 import meteordevelopment.meteorclient.renderer.MeshBuilder;
 import meteordevelopment.meteorclient.renderer.MeshRenderer;
 import meteordevelopment.meteorclient.renderer.MeteorRenderPipelines;
+//#else
+//$$ import meteordevelopment.meteorclient.renderer.DrawMode;
+//$$ import meteordevelopment.meteorclient.renderer.GL;
+//$$ import meteordevelopment.meteorclient.renderer.Mesh;
+//$$ import meteordevelopment.meteorclient.renderer.ShaderMesh;
+//$$ import meteordevelopment.meteorclient.renderer.Shaders;
+//$$ import net.minecraft.client.util.math.MatrixStack;
+//#endif
 import meteordevelopment.meteorclient.renderer.text.CustomTextRenderer;
 import meteordevelopment.meteorclient.renderer.text.Font;
 import meteordevelopment.meteorclient.renderer.text.FontFace;
@@ -30,7 +39,11 @@ import java.util.Map;
 public final class JJTextRenderer implements TextRenderer {
     private static JJTextRenderer instance;
 
+    //#if MC >= 1.21.5
     private final MeshBuilder mesh = new MeshBuilder(MeteorRenderPipelines.UI_TEXT);
+    //#else
+    //$$ private final Mesh mesh = new ShaderMesh(Shaders.TEXT, DrawMode.Triangles, Mesh.Attrib.Vec2, Mesh.Attrib.Vec2, Mesh.Attrib.Color);
+    //#endif
     private final FontFace face;
     private final ByteBuffer buffer;
     /** The size Meteor measures at, so widths and heights match its own renderer. */
@@ -149,6 +162,7 @@ public final class JJTextRenderer implements TextRenderer {
         return building;
     }
 
+    //#if MC >= 1.21.5
     @Override
     public void end() {
         if (!building) throw new RuntimeException("JJTextRenderer.end() called without calling begin()");
@@ -170,8 +184,24 @@ public final class JJTextRenderer implements TextRenderer {
         building = false;
         scale = 1;
     }
+    //#else
+    //$$ @Override
+    //$$ public void end(MatrixStack matrices) {
+    //$$     if (!building) throw new RuntimeException("JJTextRenderer.end() called without calling begin()");
+    //$$     if (!scaleOnly) {
+    //$$         mesh.end();
+    //$$         GL.bindTexture(font.texture.getGlId());
+    //$$         mesh.render(matrices);
+    //$$     }
+    //$$     building = false;
+    //$$     scale = 1;
+    //$$ }
+    //#endif
 
     private void destroy() {
+        //#if MC < 1.21.5
+        //$$ mesh.destroy();
+        //#endif
         for (Font f : sized.values()) f.texture.close();
         measure.texture.close();
         sized.clear();

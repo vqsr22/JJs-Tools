@@ -317,7 +317,12 @@ public class LightLevels extends Module {
     private void onRender(Render3DEvent event) {
         if (squares.isEmpty()) return;
 
+        //#if MC >= 1.21.5
         Renderer3D renderer = seeThroughBlocks.get() ? event.renderer : event.depthRenderer;
+        //#else
+        //$$ // Meteor's 1.21.4 build has one renderer, which draws through blocks.
+        //$$ Renderer3D renderer = event.renderer;
+        //#endif
         double inset = (1.0 - squareSize.get()) / 2.0;
 
         for (Square square : squares) {

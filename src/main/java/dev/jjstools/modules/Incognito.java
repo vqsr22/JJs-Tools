@@ -107,7 +107,11 @@ public class Incognito extends Module {
         if (coordsOn.get()) draw(r, k, coordsShape.get(), coordsX.get(), coordsY.get(), coordsW.get(), coordsH.get(), coordsColour.get());
         if (mapOn.get()) draw(r, k, mapShape.get(), mapX.get(), mapY.get(), mapW.get(), mapH.get(), mapColour.get());
         r.end();
+        //#if MC >= 1.21.5
         r.render();
+        //#else
+        //$$ r.render(null);
+        //#endif
     }
 
     /** A rectangle, or an ellipse as a stack of one pixel strips. */

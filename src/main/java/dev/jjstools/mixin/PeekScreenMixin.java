@@ -5,7 +5,6 @@ import dev.jjstools.modules.StorageGuiTweaks;
 import dev.jjstools.tint.ShulkerScreenTint;
 import meteordevelopment.meteorclient.utils.render.PeekScreen;
 import net.minecraft.block.EnderChestBlock;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.ingame.ShulkerBoxScreen;
 import net.minecraft.entity.player.PlayerInventory;

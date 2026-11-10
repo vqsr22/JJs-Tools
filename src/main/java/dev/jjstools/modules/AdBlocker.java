@@ -108,7 +108,12 @@ public class AdBlocker extends Module {
         if (msg.getStyle().getHoverEvent() != null) {
             HoverEvent event = msg.getStyle().getHoverEvent();
             // 1.21.5+: hover events are records; match the show-text one and take its text.
+            //#if MC >= 1.21.5
             if (event instanceof HoverEvent.ShowText(Text value)) {
+            //#else
+            //$$ Text value = event.getValue(HoverEvent.Action.SHOW_TEXT);
+            //$$ {
+            //#endif
                 if (value != null && value.getString().startsWith("Message ")) {
                     names.add(value.getString().substring(8).trim());
                 }

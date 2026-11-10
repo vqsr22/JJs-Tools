@@ -165,7 +165,7 @@ public class AutoMason extends Module {
         }
         else if (input.isEmpty()) {
             // One stack in at a time.
-            for (int n = 2; n < mc.player.getInventory().getMainStacks().size() + 2; n++) {
+            for (int n = 2; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 2; n++) {
                 if (!isValidItem(cutter.getSlot(n).getStack())) continue;
                 InvUtils.shiftClick().slotId(n);
                 break;
@@ -217,7 +217,7 @@ public class AutoMason extends Module {
     }
 
     private boolean hasValidItems(StonecutterScreenHandler handler) {
-        for (int n = 0; n < mc.player.getInventory().getMainStacks().size() + 2; n++) {
+        for (int n = 0; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 2; n++) {
             if (n == StonecutterScreenHandler.OUTPUT_ID) continue;
             if (isValidItem(handler.getSlot(n).getStack())) return true;
         }

@@ -597,7 +597,7 @@ public class AdvancedAutolog extends Module {
             double percentDurability = Math.floor((currentDurability / (double) maxDurability) * 100);
 
             if (percentDurability <= 5) {
-                mc.player.playSound(SoundEvents.ENTITY_ITEM_BREAK.value(), pingVolume.get() / 100.0F, 1f);
+                mc.player.playSound(dev.jjstools.compat.Compat.itemBreakSound(), pingVolume.get() / 100.0F, 1f);
                 MsgUtil.updateModuleMsg("Elytra durability: §c" + percentDurability + "§7%", this.name, "roadTripElytraWarn".hashCode());
                 reset = true;
             }

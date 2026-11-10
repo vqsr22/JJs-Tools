@@ -2,7 +2,6 @@ package dev.jjstools.tint;
 
 import dev.jjstools.modules.StorageGuiTweaks;
 import net.minecraft.block.ShulkerBoxBlock;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;

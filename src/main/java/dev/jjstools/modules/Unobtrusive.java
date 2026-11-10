@@ -352,7 +352,7 @@ public class Unobtrusive extends Module {
     private void onTick(TickEvent.Post event) {
         if (mc.player == null) return;
 
-        int slot = mc.player.getInventory().getSelectedSlot();
+        int slot = dev.jjstools.compat.Compat.selectedSlot(mc.player.getInventory());
         Item item = mc.player.getMainHandStack().getItem();
         float cooldown = mc.player.getAttackCooldownProgress(0.0F);
 

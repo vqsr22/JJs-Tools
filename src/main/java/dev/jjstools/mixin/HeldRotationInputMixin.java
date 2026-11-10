@@ -26,7 +26,13 @@ public abstract class HeldRotationInputMixin extends Input {
         if (keys == null) return;
 
         float length = (float) Math.sqrt(keys.x * keys.x + keys.y * keys.y);
+        //#if MC >= 1.21.5
         this.movementVector = length > 1.0F ? new Vec2f(keys.x / length, keys.y / length) : keys;
+        //#else
+        //$$ Vec2f movement = length > 1.0F ? new Vec2f(keys.x / length, keys.y / length) : keys;
+        //$$ this.movementSideways = movement.x;
+        //$$ this.movementForward = movement.y;
+        //#endif
         this.playerInput = new PlayerInput(
             keys.y > 0, keys.y < 0, keys.x > 0, keys.x < 0,
             this.playerInput.jump(), this.playerInput.sneak(), this.playerInput.sprint());

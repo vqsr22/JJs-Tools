@@ -162,7 +162,7 @@ public class FriendSync extends Module {
     public Module fromTag(NbtCompound tag) {
         super.fromTag(tag);
         synced.clear();
-        String saved = tag.getString("synced", "");
+        String saved = dev.jjstools.compat.Compat.nbtString(tag, "synced", "");
         if (!saved.isEmpty()) synced.addAll(List.of(saved.split("\n")));
         return this;
     }

@@ -19,8 +19,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.LightmapTextureManager;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.render.TexturedRenderLayers;
+//#if MC >= 1.21.5
 import net.minecraft.client.render.model.BlockStateManagers;
 import net.minecraft.client.render.model.BlockStateModel;
+//#endif
 //#if MC >= 1.21.9
 import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
 import net.minecraft.client.render.block.entity.state.SignBlockEntityRenderState;
@@ -35,7 +37,9 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.item.Item;
+//#if MC >= 1.21.5
 import net.minecraft.item.ItemDisplayContext;
+//#endif
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.potion.Potion;
@@ -818,6 +822,7 @@ public class SignToItemFrame extends Module {
         entry.getNormalMatrix().rotateY(radians);
     }
 
+    //#if MC >= 1.21.5
     /** The two item frame states, looked up once rather than built from the state table every sign, every frame. */
     private static BlockState frameState, glowFrameState;
 
@@ -829,6 +834,7 @@ public class SignToItemFrame extends Module {
         if (frameState == null) frameState = BlockStateManagers.getStateForItemFrame(false, false);
         return frameState;
     }
+    //#endif
 
     /** Which way each sign state faces, worked out once per state; states are shared, so this stays small. */
     private static final Map<BlockState, Float> YAWS = new IdentityHashMap<>();
@@ -901,8 +907,15 @@ public class SignToItemFrame extends Module {
      */
     private static void frame(SignToItemFrame module, MinecraftClient mc, MatrixStack matrices,
                               Out queue, Frame style, int light) {
+        //#if MC >= 1.21.5
         BlockStateModel model = mc.getBlockRenderManager()
             .getModel(frameState(style == Frame.Glow));
+        //#else
+        //$$ // 1.21.4 keeps the frame models by id rather than as block states.
+        //$$ var model = mc.getBakedModelManager().getModel(style == Frame.Glow
+        //$$     ? net.minecraft.client.render.model.BlockStatesLoader.GLOW_ITEM_FRAME_MODEL_ID
+        //$$     : net.minecraft.client.render.model.BlockStatesLoader.ITEM_FRAME_MODEL_ID);
+        //#endif
         if (model == null) return;
 
         // A glow frame lights its own contents, the same as the entity does.
@@ -926,9 +939,13 @@ public class SignToItemFrame extends Module {
         //#if MC >= 1.21.9
         queue.queue().getBatchingQueue(0).submitBlockStateModel(matrices, TexturedRenderLayers.getEntitySolid(),
             model, 1.0F, 1.0F, 1.0F, frameLight, OverlayTexture.DEFAULT_UV, 0);
-        //#else
+        //#elif MC >= 1.21.5
         //$$ net.minecraft.client.render.block.BlockModelRenderer.render(matrices.peek(),
         //$$     queue.vertices().getBuffer(TexturedRenderLayers.getEntitySolid()), model, 1.0F, 1.0F, 1.0F,
+        //$$     frameLight, OverlayTexture.DEFAULT_UV);
+        //#else
+        //$$ mc.getBlockRenderManager().getModelRenderer().render(matrices.peek(),
+        //$$     queue.vertices().getBuffer(TexturedRenderLayers.getEntitySolid()), null, model, 1.0F, 1.0F, 1.0F,
         //$$     frameLight, OverlayTexture.DEFAULT_UV);
         //#endif
         matrices.pop();
@@ -939,7 +956,11 @@ public class SignToItemFrame extends Module {
         ItemRenderState render = STATES.get(stack);
         if (render == null) {
             render = new ItemRenderState();
+            //#if MC >= 1.21.5
             mc.getItemModelManager().update(render, stack, ItemDisplayContext.FIXED, mc.world, null, 0);
+            //#else
+            //$$ mc.getItemModelManager().update(render, stack, net.minecraft.item.ModelTransformationMode.FIXED, mc.world, null, 0);
+            //#endif
             if (STATES.size() >= CACHE_LIMIT) STATES.clear();
             STATES.put(stack, render);
         }

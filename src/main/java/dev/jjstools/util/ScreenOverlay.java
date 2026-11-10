@@ -38,7 +38,7 @@ public final class ScreenOverlay {
             var access = (dev.jjstools.mixin.GameRendererAccessor) mc.gameRenderer;
             var state = access.jjstools$getGuiState();
             state.clear();
-            int mx = (int) mc.mouse.getScaledX(mc.getWindow()), my = (int) mc.mouse.getScaledY(mc.getWindow());
+            int mx = (int) dev.jjstools.compat.Compat.mouseX(), my = (int) dev.jjstools.compat.Compat.mouseY();
             //#if MC >= 1.21.9
             var context = new net.minecraft.client.gui.DrawContext(mc, state, mx, my);
             //#else

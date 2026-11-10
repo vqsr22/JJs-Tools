@@ -246,6 +246,7 @@ public class RareItemHighlighter extends Module {
         if (illegalFish.get() && stack.isOf(Items.TROPICAL_FISH_BUCKET)) {
             // 1.21.5+: the bucket's fish variant is stored as three item components
             // instead of a BucketVariantTag inside the entity NBT.
+            //#if MC >= 1.21.5
             TropicalFishEntity.Pattern pattern = stack.get(DataComponentTypes.TROPICAL_FISH_PATTERN);
             DyeColor baseColor = stack.get(DataComponentTypes.TROPICAL_FISH_BASE_COLOR);
             DyeColor patternColor = stack.get(DataComponentTypes.TROPICAL_FISH_PATTERN_COLOR);
@@ -257,6 +258,19 @@ public class RareItemHighlighter extends Module {
                     return true;
                 }
             }
+            //#else
+            //$$ // Before 1.21.5 the variant is packed into one number in the bucket's entity data.
+            //$$ var data = stack.get(DataComponentTypes.BUCKET_ENTITY_DATA);
+            //$$ if (data != null && data.contains("BucketVariantTag")) {
+            //$$     int packed = data.copyNbt().getInt("BucketVariantTag");
+            //$$     TropicalFishEntity.Variant variant = new TropicalFishEntity.Variant(packed);
+            //$$     DyeColor baseColor = variant.baseColor(), patternColor = variant.patternColor();
+            //$$     if (TropicalFishEntity.COMMON_VARIANTS.indexOf(variant) == -1
+            //$$         && (baseColor == DyeColor.BLACK || patternColor == DyeColor.BLACK)) {
+            //$$         return true;
+            //$$     }
+            //$$ }
+            //#endif
         }
 
         if (writtenBooks.get() && stack.getItem() == Items.WRITTEN_BOOK) return true;

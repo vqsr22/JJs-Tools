@@ -33,7 +33,9 @@ import meteordevelopment.meteorclient.systems.accounts.Account;
 import meteordevelopment.meteorclient.systems.modules.Module;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+//#if MC >= 1.21.5
 import net.minecraft.client.util.MacWindowUtil;
+//#endif
 
 import java.util.List;
 
@@ -842,7 +844,11 @@ public class JJGuiTheme extends GuiTheme {
     public double scale(double value) {
         double scaled = value * currentScale();
 
+        //#if MC >= 1.21.5
         if (MacWindowUtil.IS_MAC) {
+        //#else
+        //$$ if (net.minecraft.client.MinecraftClient.IS_SYSTEM_MAC) {
+        //#endif
             scaled /= (double) mc.getWindow().getWidth() / mc.getWindow().getFramebufferWidth();
         }
 

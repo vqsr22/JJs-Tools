@@ -129,7 +129,7 @@ public class Grinder extends Module {
 
     private boolean hasValidItems(GrindstoneScreenHandler handler) {
         if (mc.player == null) return false;
-        for (int n = 0; n < mc.player.getInventory().getMainStacks().size() + 3; n++) {
+        for (int n = 0; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 3; n++) {
             if (n == 2) continue; // skip output slot
             if (isValidItem(handler.getSlot(n).getStack())) return true;
         }
@@ -156,7 +156,7 @@ public class Grinder extends Module {
 
     private int predictEmptySlot(GrindstoneScreenHandler handler) {
         if (mc.player == null) return -1;
-        for (int n = mc.player.getInventory().getMainStacks().size() + 2; n >= 3; n--) {
+        for (int n = dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 2; n >= 3; n--) {
             if (processedSlots.contains(n) && !projectedEmpty.contains(n)) continue;
             if (projectedEmpty.contains(n)) {
                 projectedEmpty.rem(n);
@@ -211,7 +211,7 @@ public class Grinder extends Module {
             );
         } else if (currentTarget != null) {
             // fill input slot 2
-            for (int n = 3; n < mc.player.getInventory().getMainStacks().size() + 3; n++) {
+            for (int n = 3; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 3; n++) {
                 if (processedSlots.contains(n)) continue;
                 ItemStack stack = handler.getSlot(n).getStack();
                 if (!isValidItem(stack) || !stack.isOf(currentTarget.getItem())) continue;
@@ -235,7 +235,7 @@ public class Grinder extends Module {
             return generatePacket(handler);
         } else {
             // fill input slot 1
-            for (int n = 3; n < mc.player.getInventory().getMainStacks().size() + 3; n++) {
+            for (int n = 3; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 3; n++) {
                 if (processedSlots.contains(n)) continue;
                 ItemStack stack = handler.getSlot(n).getStack();
                 if (!isValidItem(stack)) continue;
@@ -331,7 +331,7 @@ public class Grinder extends Module {
                 if (!hasValidItems(grindstone)) finished();
                 else if (input1.isEmpty() && input2.isEmpty()) {
                     Item turboItem = null;
-                    for (int n = 3; n < mc.player.getInventory().getMainStacks().size() + 3; n++) {
+                    for (int n = 3; n < dev.jjstools.compat.Compat.mainSize(mc.player.getInventory()) + 3; n++) {
                         ItemStack stack = grindstone.getSlot(n).getStack();
                         if (!hasValidEnchantments(stack)) continue;
                         else if (!itemList.get().contains(stack.getItem())) continue;

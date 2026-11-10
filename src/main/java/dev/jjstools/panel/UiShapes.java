@@ -119,7 +119,7 @@ public final class UiShapes {
         }
         Identifier id = Identifier.of("jjs-tools", "panel_shape/" + key.toLowerCase(java.util.Locale.ROOT));
         int fw = w, fh = h;
-        NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "JJ's Tools panel shape " + key, image);
+        NativeImageBackedTexture texture = dev.jjstools.compat.Compat.texture(() -> "JJ's Tools panel shape " + key, image);
         texture.upload();
         MinecraftClient.getInstance().getTextureManager().registerTexture(id, texture);
         shape = new Shape(id, fw, fh);

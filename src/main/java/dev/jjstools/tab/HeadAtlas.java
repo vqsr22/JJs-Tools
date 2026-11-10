@@ -1,7 +1,6 @@
 package dev.jjstools.tab;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.AbstractTexture;
 import net.minecraft.client.texture.NativeImage;
@@ -102,7 +101,7 @@ public final class HeadAtlas {
         if (texture != null) return true;
         try {
             image = new NativeImage(SIZE, SIZE, true);
-            texture = new NativeImageBackedTexture(() -> "JJ's Tools tab head atlas", image);
+            texture = dev.jjstools.compat.Compat.texture(() -> "JJ's Tools tab head atlas", image);
             MinecraftClient.getInstance().getTextureManager().registerTexture(ID, texture);
             return true;
         } catch (Throwable t) {

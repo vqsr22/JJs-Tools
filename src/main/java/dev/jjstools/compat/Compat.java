@@ -87,4 +87,78 @@ public final class Compat {
         //$$ return profile.getId();
         //#endif
     }
+
+    /** How many slots the main inventory has, hotbar included. */
+    public static int mainSize(net.minecraft.entity.player.PlayerInventory inventory) {
+        //#if MC >= 1.21.5
+        return inventory.getMainStacks().size();
+        //#else
+        //$$ return inventory.main.size();
+        //#endif
+    }
+
+    /** The selected hotbar slot. */
+    public static int selectedSlot(net.minecraft.entity.player.PlayerInventory inventory) {
+        //#if MC >= 1.21.5
+        return inventory.getSelectedSlot();
+        //#else
+        //$$ return inventory.selectedSlot;
+        //#endif
+    }
+
+    /** A string from a tag, or the fallback if it has none. */
+    public static String nbtString(net.minecraft.nbt.NbtCompound tag, String key, String fallback) {
+        //#if MC >= 1.21.5
+        return tag.getString(key, fallback);
+        //#else
+        //$$ return tag.contains(key, net.minecraft.nbt.NbtElement.STRING_TYPE) ? tag.getString(key) : fallback;
+        //#endif
+    }
+
+    /** A compound from a tag, or an empty one if it has none. */
+    public static net.minecraft.nbt.NbtCompound nbtCompound(net.minecraft.nbt.NbtCompound tag, String key) {
+        //#if MC >= 1.21.5
+        return tag.getCompoundOrEmpty(key);
+        //#else
+        //$$ return tag.getCompound(key);
+        //#endif
+    }
+
+    /** Where the mouse is, in GUI pixels. */
+    public static double mouseX() {
+        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+        //#if MC >= 1.21.5
+        return mc.mouse.getScaledX(mc.getWindow());
+        //#else
+        //$$ return mc.mouse.getX() * mc.getWindow().getScaledWidth() / mc.getWindow().getWidth();
+        //#endif
+    }
+
+    /** Where the mouse is, in GUI pixels. */
+    public static double mouseY() {
+        net.minecraft.client.MinecraftClient mc = net.minecraft.client.MinecraftClient.getInstance();
+        //#if MC >= 1.21.5
+        return mc.mouse.getScaledY(mc.getWindow());
+        //#else
+        //$$ return mc.mouse.getY() * mc.getWindow().getScaledHeight() / mc.getWindow().getHeight();
+        //#endif
+    }
+
+    /** A texture made from an image, with a name for debugging where the version has one. */
+    public static net.minecraft.client.texture.NativeImageBackedTexture texture(java.util.function.Supplier<String> name, net.minecraft.client.texture.NativeImage image) {
+        //#if MC >= 1.21.5
+        return new net.minecraft.client.texture.NativeImageBackedTexture(name, image);
+        //#else
+        //$$ return new net.minecraft.client.texture.NativeImageBackedTexture(image);
+        //#endif
+    }
+
+    /** The sound of an item breaking. */
+    public static net.minecraft.sound.SoundEvent itemBreakSound() {
+        //#if MC >= 1.21.5
+        return net.minecraft.sound.SoundEvents.ENTITY_ITEM_BREAK.value();
+        //#else
+        //$$ return net.minecraft.sound.SoundEvents.ENTITY_ITEM_BREAK;
+        //#endif
+    }
 }

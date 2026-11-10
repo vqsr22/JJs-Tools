@@ -5,7 +5,6 @@ import meteordevelopment.meteorclient.renderer.text.FontFace;
 import meteordevelopment.meteorclient.systems.config.Config;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
-import net.minecraft.client.gl.RenderPipelines;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
@@ -239,7 +238,7 @@ public final class UiFont {
                 }
                 int n = ++textures;
                 Identifier id = Identifier.of("jjs-tools", "panel_font/" + n);
-                NativeImageBackedTexture texture = new NativeImageBackedTexture(() -> "JJ's Tools panel font " + key + " " + px, image);
+                NativeImageBackedTexture texture = dev.jjstools.compat.Compat.texture(() -> "JJ's Tools panel font " + key + " " + px, image);
                 texture.upload();
                 MinecraftClient.getInstance().getTextureManager().registerTexture(id, texture);
 
