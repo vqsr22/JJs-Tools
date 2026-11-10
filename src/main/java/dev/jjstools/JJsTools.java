@@ -85,6 +85,7 @@ public class JJsTools extends MeteorAddon {
         Modules.get().add(new KitCreator());
         Modules.get().add(new NoJolt());
         Modules.get().add(new ModuleWheel());
+        Modules.get().add(new FriendSync());
         Modules.get().add(new InventoryLoadout());
         Modules.get().add(new SignToItemFrame());
         Modules.get().add(new Unobtrusive());

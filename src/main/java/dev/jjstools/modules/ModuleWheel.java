@@ -40,7 +40,14 @@ public class ModuleWheel extends Module {
 
     private final Setting<List<Module>> modules = sgGeneral.add(new ModuleListSetting.Builder()
         .name("modules")
-        .description("The modules on the wheel, clockwise from the top. Right-click and drag one in the wheel to move it.")
+        .description("The modules on the wheel. Right-click and drag one in the wheel to move it.")
+        .build()
+    );
+
+    private final Setting<List<String>> commands = sgGeneral.add(new StringListSetting.Builder()
+        .name("commands")
+        .description("Commands on the wheel, run when chosen: /home for the server, .toggle for Meteor, #goto for Baritone. Each one's name and icon are set below.")
+        .onChanged(list -> refreshIfCountChanged())
         .build()
     );
 
@@ -62,6 +69,24 @@ public class ModuleWheel extends Module {
         .build()
     );
 
+    private final Setting<Double> iconSize = sgGeneral.add(new DoubleSetting.Builder()
+        .name("icon-size")
+        .description("How big the icons are on the wheel.")
+        .defaultValue(1.0)
+        .range(0.5, 3.0)
+        .sliderRange(0.5, 3.0)
+        .build()
+    );
+
+    private final Setting<Double> textSize = sgGeneral.add(new DoubleSetting.Builder()
+        .name("text-size")
+        .description("How big the names are on the wheel.")
+        .defaultValue(1.0)
+        .range(0.5, 3.0)
+        .sliderRange(0.5, 3.0)
+        .build()
+    );
+
     private final Setting<Boolean> hint = sgGeneral.add(new BoolSetting.Builder()
         .name("show-hint-message")
         .description("Show how to move modules under the wheel.")
@@ -69,43 +94,111 @@ public class ModuleWheel extends Module {
         .build()
     );
 
+    private int commandLines = -1;
+
+    /**
+     * Adding or removing a command line opens the settings again straight away, so its name and
+     * icon show below at once. Only then, not while a command is typed, so typing is not cut off.
+     */
+    private void refreshIfCountChanged() {
+        int count = commands.get().size();
+        if (commandLines >= 0 && count != commandLines
+            && mc.currentScreen instanceof meteordevelopment.meteorclient.gui.WidgetScreen screen) {
+            mc.send(screen::reload);
+        }
+        commandLines = count;
+    }
+
     /** The key was down last tick, so holding it after the wheel closes does not open it again. */
     private boolean wasDown;
 
-    /** Each module's icon on the wheel, by module name: the item, and whether it shimmers. */
+    /** Each slot's icon, by its key (a module's name, or "cmd:" and the command): the item, and whether it shimmers. */
     private record Icon(net.minecraft.item.Item item, boolean glint) {}
     private final java.util.Map<String, Icon> icons = new java.util.HashMap<>();
+    /** The names given to commands on the wheel, by key; a command without one shows itself. */
+    private final java.util.Map<String, String> names = new java.util.HashMap<>();
+    /** The order of the slots round the wheel by key, as last arranged; anything new goes at the end. */
+    private final List<String> order = new ArrayList<>();
 
-    private Icon iconFor(Module m) {
-        Icon icon = icons.get(m.name);
-        if (icon != null) return icon;
-        // Until one is picked, the icon of the module's category.
-        return new Icon(dev.jjstools.util.CategoryIcons.itemFor(m.category), false);
+    /** One place on the wheel: a module to turn on or off, or a command to run. */
+    private record Slot(String key, String label, Module module, String command) {
+        boolean active() {
+            return module != null && module.isActive();
+        }
     }
 
-    private net.minecraft.item.ItemStack stackFor(Module m) {
-        Icon icon = iconFor(m);
+    private List<Slot> slots() {
+        java.util.Map<String, Slot> byKey = new java.util.LinkedHashMap<>();
+        for (Module m : modules.get()) byKey.put(m.name, new Slot(m.name, m.title.toLowerCase(Locale.ROOT), m, null));
+        List<String> lines = commands.get();
+        for (int i = 0; i < lines.size(); i++) {
+            String command = lines.get(i).trim();
+            if (command.isEmpty()) continue;
+            // Known by its line, so its name and icon stay with it while the command is edited.
+            String key = "cmd:" + i;
+            String name = names.getOrDefault(key, "").trim();
+            byKey.put(key, new Slot(key, name.isEmpty() ? command : name, null, command));
+        }
+        List<Slot> out = new ArrayList<>();
+        for (String key : order) {
+            Slot slot = byKey.remove(key);
+            if (slot != null) out.add(slot);
+        }
+        out.addAll(byKey.values());
+        return out;
+    }
+
+    private Icon iconFor(Slot slot) {
+        Icon icon = icons.get(slot.key());
+        if (icon != null) return icon;
+        // Until one is picked: the module's category icon, or a command block for a command.
+        if (slot.module() != null) return new Icon(dev.jjstools.util.CategoryIcons.itemFor(slot.module().category), false);
+        return new Icon(net.minecraft.item.Items.COMMAND_BLOCK, false);
+    }
+
+    private net.minecraft.item.ItemStack stackFor(Slot slot) {
+        Icon icon = iconFor(slot);
         return dev.jjstools.util.CategoryIcons.stackFor(icon.item(), icon.glint());
     }
 
-    /** An icon and an enchanted switch for every module on the wheel, under the settings. */
+    /** For every slot on the wheel, under the settings: its icon and an enchanted switch, and a name for commands. */
     @Override
     public meteordevelopment.meteorclient.gui.widgets.WWidget getWidget(meteordevelopment.meteorclient.gui.GuiTheme theme) {
+        commandLines = commands.get().size();
         Settings wheel = new Settings();
-        for (Module m : modules.get()) {
-            SettingGroup group = wheel.createGroup(m.title);
-            Icon now = iconFor(m);
+        // Every module on the wheel, then every command line, even one not filled in yet, so a
+        // new line's name and icon are there to set straight away.
+        List<Slot> all = new ArrayList<>();
+        for (Slot slot : slots()) if (slot.module() != null) all.add(slot);
+        List<String> lines = commands.get();
+        for (int i = 0; i < lines.size(); i++) all.add(new Slot("cmd:" + i, lines.get(i).trim(), null, lines.get(i).trim()));
+        for (Slot slot : all) {
+            String title = slot.module() != null ? slot.label()
+                : "command " + (Integer.parseInt(slot.key().substring(4)) + 1) + (slot.command().isEmpty() ? "" : ": " + slot.command());
+            SettingGroup group = wheel.createGroup(title);
+            Icon now = iconFor(slot);
+            if (slot.command() != null) {
+                group.add(new StringSetting.Builder()
+                    .name("name")
+                    .description("What the wheel shows for " + slot.command() + ". Empty shows the command itself.")
+                    .defaultValue(names.getOrDefault(slot.key(), ""))
+                    .onChanged(name -> {
+                        if (name.isBlank()) names.remove(slot.key());
+                        else names.put(slot.key(), name.trim());
+                    })
+                    .build());
+            }
             group.add(new ItemSetting.Builder()
                 .name("icon")
-                .description("The item shown for " + m.title + " on the wheel.")
+                .description("The item shown for " + slot.label() + " on the wheel.")
                 .defaultValue(now.item())
-                .onChanged(item -> { icons.put(m.name, new Icon(item, iconFor(m).glint())); })
+                .onChanged(item -> icons.put(slot.key(), new Icon(item, iconFor(slot).glint())))
                 .build());
             group.add(new BoolSetting.Builder()
                 .name("enchanted")
                 .description("Give the icon an enchantment shimmer.")
                 .defaultValue(now.glint())
-                .onChanged(glint -> { icons.put(m.name, new Icon(iconFor(m).item(), glint)); })
+                .onChanged(glint -> icons.put(slot.key(), new Icon(iconFor(slot).item(), glint)))
                 .build());
         }
         return theme.settings(wheel);
@@ -120,6 +213,10 @@ public class ModuleWheel extends Module {
             saved.putString(e.getKey(), net.minecraft.registry.Registries.ITEM.getId(e.getValue().item()) + "|" + e.getValue().glint());
         }
         tag.put("wheel-icons", saved);
+        net.minecraft.nbt.NbtCompound savedNames = new net.minecraft.nbt.NbtCompound();
+        for (var e : names.entrySet()) savedNames.putString(e.getKey(), e.getValue());
+        tag.put("wheel-names", savedNames);
+        tag.putString("wheel-order", String.join("\n", order));
         return tag;
     }
 
@@ -129,37 +226,48 @@ public class ModuleWheel extends Module {
         icons.clear();
         net.minecraft.nbt.NbtCompound saved = tag.getCompoundOrEmpty("wheel-icons");
         for (String key : saved.getKeys()) {
-            String[] parts = saved.getString(key, "").split("\\|");
-            var id = net.minecraft.util.Identifier.tryParse(parts[0]);
+            String value = saved.getString(key, "");
+            int bar = value.lastIndexOf('|');
+            String itemId = bar >= 0 ? value.substring(0, bar) : value;
+            boolean glint = bar >= 0 && Boolean.parseBoolean(value.substring(bar + 1));
+            var id = net.minecraft.util.Identifier.tryParse(itemId);
             if (id == null || !net.minecraft.registry.Registries.ITEM.containsId(id)) continue;
-            icons.put(key, new Icon(net.minecraft.registry.Registries.ITEM.get(id), parts.length > 1 && Boolean.parseBoolean(parts[1])));
+            icons.put(key, new Icon(net.minecraft.registry.Registries.ITEM.get(id), glint));
         }
+        names.clear();
+        net.minecraft.nbt.NbtCompound savedNames = tag.getCompoundOrEmpty("wheel-names");
+        for (String key : savedNames.getKeys()) names.put(key, savedNames.getString(key, ""));
+        order.clear();
+        String savedOrder = tag.getString("wheel-order", "");
+        if (!savedOrder.isEmpty()) order.addAll(List.of(savedOrder.split("\n")));
         return this;
     }
 
     public ModuleWheel() {
-        super(JJsTools.CATEGORY, "module-wheel", "Hold a key to open a wheel of modules and let go over one to turn it on or off. Right-click and drag a module in the wheel to move it to another slot.");
+        super(JJsTools.CATEGORY, "module-wheel", "Hold a key to open a wheel of modules and commands and let go over one to turn it on or off or run it. Right-click and drag one in the wheel to move it to another slot.");
     }
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
         boolean down = wheelKey.get().isSet() && wheelKey.get().isPressed();
-        if (down && !wasDown && mc.currentScreen == null && !modules.get().isEmpty()) {
+        if (down && !wasDown && mc.currentScreen == null && !slots().isEmpty()) {
             mc.setScreen(new WheelScreen());
         }
         wasDown = down;
     }
 
     private final class WheelScreen extends Screen {
-        private final List<Module> list = new ArrayList<>(modules.get());
+        private final List<Slot> list = slots();
         private int[] palette;
         private boolean done;
-        /** The module being moved with the right mouse button, or null. */
-        private Module dragging;
-        /** Where each module is drawn right now: its angle round the wheel and distance out. */
-        private final java.util.Map<Module, double[]> shown = new java.util.HashMap<>();
-        private long lastFrame;
-        private boolean first = true;
+        /** The slot being moved with the right mouse button, or null. */
+        private Slot dragging;
+        /** Where each slot is drawn right now: its angle round the wheel and distance out. */
+        private final java.util.Map<Slot, double[]> shown = new java.util.HashMap<>();
+        private final double openedAt = dev.jjstools.util.Motion.now();
+        private double closingAt = -1;
+        /** The slot chosen as the wheel closes, which pulses to show it took. */
+        private Slot pulsed;
 
         WheelScreen() {
             super(Text.literal("module wheel"));
@@ -192,9 +300,7 @@ public class ModuleWheel extends Module {
             // closes, keeping the new order.
             if (!wheelKey.get().isPressed()) {
                 if (dragging != null) {
-                    dragging = null;
-                    done = true;
-                    close();
+                    finish(null);
                 } else {
                     choose(hoveredNow());
                 }
@@ -208,6 +314,7 @@ public class ModuleWheel extends Module {
          */
         @Override
         public boolean mouseClicked(Click click, boolean doubled) {
+            if (done) return true;
             if (click.button() == 1) {
                 int at = hovered(click.x(), click.y());
                 if (at >= 0) dragging = list.get(at);
@@ -238,8 +345,9 @@ public class ModuleWheel extends Module {
         public boolean mouseReleased(Click click) {
             if (click.button() == 1 && dragging != null) {
                 dragging = null;
-                // The wheel's order is the modules setting's order, so it is kept.
-                modules.set(new ArrayList<>(list));
+                // Kept for next time, and saved with the module.
+                order.clear();
+                for (Slot slot : list) order.add(slot.key());
                 return true;
             }
             return super.mouseReleased(click);
@@ -252,14 +360,39 @@ public class ModuleWheel extends Module {
 
         private void choose(int index) {
             if (done) return;
+            Slot slot = index >= 0 && index < list.size() ? list.get(index) : null;
+            finish(slot);
+            if (slot == null) return;
+            if (slot.module() != null) slot.module().toggle();
+            else if (mc.player != null) meteordevelopment.meteorclient.utils.player.ChatUtils.sendPlayerMsg(slot.command());
+        }
+
+        /** Starts the wheel shrinking away, the chosen slot giving a pulse; it closes when that is done. */
+        private void finish(Slot chosen) {
+            if (done) return;
             done = true;
-            if (index >= 0 && index < list.size()) list.get(index).toggle();
-            close();
+            dragging = null;
+            closingAt = dev.jjstools.util.Motion.now();
+            if (chosen != null) {
+                pulsed = chosen;
+                dev.jjstools.util.Motion.pulse(chosen);
+            }
         }
 
         @Override
         public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
             super.render(ctx, mouseX, mouseY, delta);
+            // Shrinking away after a choice: closed once that is over.
+            double whole;
+            if (closingAt >= 0) {
+                whole = dev.jjstools.util.Motion.exit(closingAt);
+                if (whole <= 0) {
+                    close();
+                    return;
+                }
+            } else {
+                whole = dev.jjstools.util.Motion.enter(openedAt, 0);
+            }
             if (palette == null) palette = Ui.palette(Ui.currentTheme());
             int panel = palette[0], well = palette[1], accent = palette[3], text = palette[4];
             TextRenderer tr = textRenderer;
@@ -268,36 +401,51 @@ public class ModuleWheel extends Module {
             int cx = width / 2, cy = height / 2;
             int r = size.get();
             int safe = (int) Math.round(r * safeSize.get());
+            // The whole wheel grows out of its middle from 95% as it opens, easing out, and
+            // shrinks back into it, a fifth quicker, when done.
+            float grow = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * whole);
+            var whole2 = ctx.getMatrices();
+            whole2.pushMatrix();
+            whole2.translate(cx, cy);
+            whole2.scale(grow, grow);
+            whole2.translate(-cx, -cy);
             disc(ctx, cx, cy, r, panel);
             disc(ctx, cx, cy, safe, well);
 
-            int over = dragging != null ? list.indexOf(dragging) : hovered(mouseX, mouseY);
+            int over = closingAt >= 0 ? (pulsed != null ? list.indexOf(pulsed) : -1)
+                : dragging != null ? list.indexOf(dragging) : hovered(mouseX, mouseY);
             double step = 360.0 / list.size();
             double labelR = (safe + r) / 2.0;
 
-            // Each module glides to its slot round the wheel rather than jumping, along the
-            // shorter way round; the one being moved sits under the cursor until let go.
-            long now = System.nanoTime();
-            double seconds = lastFrame == 0 ? 0 : Math.min(0.1, (now - lastFrame) / 1e9);
-            lastFrame = now;
-            double k = 1 - Math.exp(-seconds * 14);
+            // Each slot moves round the wheel on an arc, the shorter way, easing in and out, rather
+            // than jumping. On opening they sweep out from the middle one after another. The one
+            // being moved sits exactly under the cursor while held, with no easing to lag it.
+            double now = dev.jjstools.util.Motion.now();
             for (int i = 0; i < list.size(); i++) {
-                Module m = list.get(i);
-                double[] p = shown.computeIfAbsent(m, x -> new double[] { 0, labelR });
+                Slot m = list.get(i);
                 double slot = i * step - 90;
+                // angle, distance, from angle, from distance, start time, target angle, delay, coming in
+                double[] p = shown.computeIfAbsent(m, x -> new double[] { slot - 25, safe, slot - 25, safe, openedAt, slot,
+                    Math.min(shown.size(), 12) * dev.jjstools.util.Motion.STAGGER_MS, 1 });
                 if (m == dragging) {
                     p[0] = Math.toDegrees(Math.atan2(mouseY - cy, mouseX - cx));
                     p[1] = Math.hypot(mouseX - cx, mouseY - cy);
-                } else if (first) {
-                    p[0] = slot;
-                    p[1] = labelR;
-                } else {
-                    double diff = ((slot - p[0]) % 360 + 540) % 360 - 180;
-                    p[0] += diff * k;
-                    p[1] += (labelR - p[1]) * k;
+                    p[5] = Double.NaN;   // starts a move from here when let go
+                    continue;
                 }
+                if (p[5] != slot) {
+                    p[2] = p[0];
+                    p[3] = p[1];
+                    p[4] = now;
+                    p[5] = slot;
+                    p[6] = 0;
+                    p[7] = 0;
+                }
+                double e = p[7] == 1 ? dev.jjstools.util.Motion.enter(p[4], p[6]) : dev.jjstools.util.Motion.move(p[4], p[6]);
+                double diff = ((slot - p[2]) % 360 + 540) % 360 - 180;
+                p[0] = p[2] + diff * e;
+                p[1] = p[3] + (labelR - p[3]) * e;
             }
-            first = false;
 
             if (hint.get()) {
                 int dim = palette[5];
@@ -315,27 +463,43 @@ public class ModuleWheel extends Module {
             // The one being moved last, so it is drawn over the rest.
             for (int i = 0; i < list.size(); i++) if (list.get(i) != dragging) slot(ctx, tr, font, list.get(i), i == over, cx, cy, panel, accent, text);
             if (dragging != null) slot(ctx, tr, font, dragging, true, cx, cy, panel, accent, text);
+            whole2.popMatrix();
         }
 
-        private void slot(DrawContext ctx, TextRenderer tr, boolean font, Module m, boolean hot, int cx, int cy, int panel, int accent, int text) {
+        private void slot(DrawContext ctx, TextRenderer tr, boolean font, Slot m, boolean hot, int cx, int cy, int panel, int accent, int text) {
             double[] p = shown.get(m);
             if (p == null) return;
             int lineH = 9;
-            String name = m.title.toLowerCase(Locale.ROOT);
+            String name = m.label();
             double a = Math.toRadians(p[0]);
-            int lx = (int) Math.round(cx + Math.cos(a) * p[1]);
-            int ly = (int) Math.round(cy + Math.sin(a) * p[1]);
-            int w = Math.round(font ? UiFont.width(tr, name) : tr.getWidth(name));
-            // The icon above the name, the two together centred on the slot.
-            int pw = Math.max(w, 16) + 10, ph = 16 + 2 + lineH + 8;
-            int px = lx - pw / 2, py = ly - ph / 2;
+            double lx = cx + Math.cos(a) * p[1];
+            double ly = cy + Math.sin(a) * p[1];
+            // The icon above the name, the two together centred on the slot, each at its own size.
+            float ki = iconSize.get().floatValue(), kt = textSize.get().floatValue();
+            float w = (font ? UiFont.width(tr, name) : tr.getWidth(name)) * kt;
+            float icon = 16 * ki, textH = lineH * kt;
+            int pw = Math.round(Math.max(w, icon) + 10), ph = Math.round(4 + icon + 2 + textH + 4);
+            float k = (float) dev.jjstools.util.Motion.pulseScale(m);
+            var matrices = ctx.getMatrices();
+            matrices.pushMatrix();
+            matrices.translate((float) lx, (float) ly);
+            matrices.scale(k, k);
+            int px = -pw / 2, py = -ph / 2;
             // Monkeytype's swap: under the mouse, text colour behind and background colour on top.
-            if (hot) round(ctx, px, py, pw, ph, 5, text);
-            ctx.drawItem(stackFor(m), lx - 8, py + 4);
-            int ink = hot ? panel : m.isActive() ? accent : text;
-            int ty = py + 4 + 16 + 2;
-            if (font) UiFont.draw(ctx, tr, name, lx - w / 2, ty, 1.0F, ink);
-            else ctx.drawText(tr, name, lx - w / 2, ty, ink, false);
+            if (hot) round(ctx, px, py, pw, ph, 5, text, k);
+            matrices.pushMatrix();
+            matrices.translate(0, py + 4);
+            matrices.scale(ki, ki);
+            ctx.drawItem(stackFor(m), -8, 0);
+            matrices.popMatrix();
+            int ink = hot ? panel : m.active() ? accent : text;
+            matrices.pushMatrix();
+            matrices.translate(-w / 2, py + 4 + icon + 2);
+            matrices.scale(kt, kt);
+            if (font) UiFont.draw(ctx, tr, name, 0, 0, 1.0F, ink);
+            else ctx.drawText(tr, name, 0, 0, ink, false);
+            matrices.popMatrix();
+            matrices.popMatrix();
         }
 
         private void disc(DrawContext ctx, int cx, int cy, int r, int argb) {
@@ -344,12 +508,12 @@ public class ModuleWheel extends Module {
             ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), cx - r, cy - r, 0, 0, r * 2, r * 2, rp * 2, rp * 2, c.w(), c.h(), argb);
         }
 
-        private void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb) {
+        private void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb, float scale) {
             r = Math.min(r, Math.min(w, h) / 2);
             ctx.fill(x + r, y, x + w - r, y + h, argb);
             ctx.fill(x, y + r, x + r, y + h - r, argb);
             ctx.fill(x + w - r, y + r, x + w, y + h - r, argb);
-            int rp = Math.max(1, (int) Math.round(r * MinecraftClient.getInstance().getWindow().getScaleFactor()));
+            int rp = Math.max(1, (int) Math.round(r * scale * MinecraftClient.getInstance().getWindow().getScaleFactor()));
             var c = UiShapes.circle(rp);
             ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x, y, 0, 0, r, r, rp, rp, c.w(), c.h(), argb);
             ctx.drawTexture(RenderPipelines.GUI_TEXTURED, c.id(), x + w - r, y, rp, 0, r, r, rp, rp, c.w(), c.h(), argb);

@@ -47,12 +47,41 @@ public class WJJWindow extends WWindow implements JJWidget {
         }
     }
 
+    /**
+     * For auto fit: makes the list just tall enough for the window's bottom edge to sit at the
+     * given height on screen, scrolling whatever does not fit, and keeps that height. A list
+     * shorter than that is left as it is.
+     */
+    public void fitBottomTo(double bottom) {
+        if (id == null || !expanded) return;
+        double room = bottom - y - (height - view.height);
+        view.maxHeight = Math.max(minListHeight(), room);
+        Prefs.get().meteorWindowHeights.put(id, (int) Math.floor(view.maxHeight));
+    }
+
     private double minListHeight() {
         return theme.textHeight() * 3;
     }
 
+    /** How much of the window shows while it folds or unfolds, eased in and out rather than at a constant speed. */
     private double shownHeight() {
-        return Math.min(height, header.height + (height - header.height) * animProgress);
+        double k = dev.jjstools.util.Motion.off() ? (expanded ? 1 : 0) : dev.jjstools.util.Motion.easeInOut(animProgress);
+        return Math.min(height, header.height + (height - header.height) * k);
+    }
+
+    /**
+     * Where a module column stands in the row, counting from the left, for the columns coming in
+     * one after another when the screen opens. Zero for anything not in a module column.
+     */
+    public static int columnIndex(meteordevelopment.meteorclient.gui.widgets.WWidget inside) {
+        meteordevelopment.meteorclient.gui.widgets.WWidget w = inside;
+        while (w != null && !(w instanceof WJJWindow)) w = w.parent;
+        if (!(w instanceof WJJWindow window) || !(window.parent instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer row)) return 0;
+        int index = 0;
+        for (var cell : row.cells) {
+            if (cell.widget() instanceof WJJWindow other && other != window && other.isModuleColumn() && other.x < window.x) index++;
+        }
+        return index;
     }
 
     /** How far the grabbable strip reaches, in and below the bottom edge: generous, so it is easy to catch. */
@@ -230,6 +259,25 @@ public class WJJWindow extends WWindow implements JJWidget {
     public boolean render(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
         if (!visible) return true;
         boolean column = isModuleColumn();
+        // Coming in when the screen opens: each module column a moment after the one to its
+        // left, rising into place. Moved for the drawing only, and back straight after.
+        double rise = 0;
+        if (column) {
+            double opened = dev.jjstools.util.Motion.openedAt(net.minecraft.client.MinecraftClient.getInstance().currentScreen);
+            if (dev.jjstools.util.Motion.now() - opened < 1500) {
+                double in = dev.jjstools.util.Motion.enter(opened, columnIndex(this) * dev.jjstools.util.Motion.STAGGER_MS);
+                rise = Math.round((1 - in) * theme.scale(10));
+            }
+        }
+        if (rise != 0) move(0, rise);
+        try {
+            return renderInPlace(renderer, mouseX, mouseY, delta, column);
+        } finally {
+            if (rise != 0) move(0, -rise);
+        }
+    }
+
+    private boolean renderInPlace(GuiRenderer renderer, double mouseX, double mouseY, double delta, boolean column) {
         // Starting the column's clip draws whatever the screen had waiting, such as the top bar's
         // words, so that happens first, at the normal scale; only then does the column's own
         // scale take over. The other way round, the top bar's text came out at the module list size.

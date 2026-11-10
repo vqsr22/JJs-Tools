@@ -20,6 +20,8 @@ import meteordevelopment.meteorclient.utils.render.color.Color;
  */
 public class WJJCheckbox extends WCheckbox implements JJWidget {
     private double mouseX;
+    /** Each side's own press and pulse. */
+    private final Object offKey = new Object(), onKey = new Object();
 
     public WJJCheckbox(boolean checked) {
         super(checked);
@@ -62,17 +64,19 @@ public class WJJCheckbox extends WCheckbox implements JJWidget {
     @Override
     protected void onRender(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
         double w = side();
-        drawSide(renderer, x, w, "off", !checked, mouseOver && !overOn());
-        drawSide(renderer, x + w + gap(), width - w - gap(), "on", checked, mouseOver && overOn());
+        drawSide(renderer, offKey, x, w, "off", !checked, mouseOver && !overOn());
+        drawSide(renderer, onKey, x + w + gap(), width - w - gap(), "on", checked, mouseOver && overOn());
     }
 
-    private void drawSide(GuiRenderer renderer, double sx, double w, String label, boolean chosen, boolean hot) {
+    private void drawSide(GuiRenderer renderer, Object key, double sx, double w, String label, boolean chosen, boolean hot) {
         JJGuiTheme theme = theme();
         Color bg = hot && pressed ? theme.textSecondaryColor.get()
             : hot ? theme.textColor.get()
             : chosen ? theme.checkboxColor.get()
             : theme.backgroundColor.get(false, false, true);
-        round(renderer, sx, y, w, height, theme.radius(), bg);
+        // Smaller while held, and a short pulse when this side becomes the chosen one.
+        double k = dev.jjstools.util.Motion.press(key, hot && pressed) * dev.jjstools.util.Motion.pulseOnTurn(key, chosen);
+        roundScaled(renderer, sx, y, w, height, theme.radius(), bg, k);
         String shown = theme.shown(label);
         renderer.text(shown, sx + (w - theme.textWidth(shown)) / 2, y + pad(), theme.ink(hot || chosen), false);
     }

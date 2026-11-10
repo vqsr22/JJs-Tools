@@ -974,6 +974,29 @@ public final class Ui {
         return new int[] { bg, ink, 0 };
     }
 
+    /**
+     * The shape behind something pressable: a touch smaller at once while held, easing back
+     * when let go, and a short pulse when it turns on. Only the shape moves; what is written on
+     * it stays put, so it reads steadily.
+     */
+    private void shape(int x, int y, int w, int h, int colour, boolean on, boolean enabled) {
+        // Known by where it is, since these are drawn afresh every frame.
+        long key = ((long) x << 48) ^ ((long) y << 32) ^ ((long) w << 16) ^ h;
+        double k = dev.jjstools.util.Motion.press(key, enabled && down && hovered(x, y, w, h))
+            * dev.jjstools.util.Motion.pulseOnTurn(key, on);
+        if (k == 1) {
+            round(x, y, w, h, 3, colour);
+            return;
+        }
+        var m = ctx.getMatrices();
+        m.pushMatrix();
+        m.translate(x + w / 2F, y + h / 2F);
+        m.scale((float) k, (float) k);
+        m.translate(-(x + w / 2F), -(y + h / 2F));
+        round(x, y, w, h, 3, colour);
+        m.popMatrix();
+    }
+
     /** Blends two colours, transparency included. */
     private static int mixArgb(int a, int b, float t) {
         int aa = (a >>> 24) & 0xFF, ba = (b >>> 24) & 0xFF;
@@ -984,7 +1007,7 @@ public final class Ui {
     /** A button. Returns true while hovered. */
     public boolean button(int x, int y, int w, int h, String label, boolean enabled, Runnable action) {
         int[] c = look(x, y, w, h, buttonColour(), false, enabled);
-        round(x, y, w, h, 3, c[0]);
+        shape(x, y, w, h, c[0], false, enabled);
         String shown = label.length() <= 1 ? label : fit(label, w - 6);
         textCentred(shown, x + w / 2, y + (h - lineH()) / 2 + 1, c[1]);
         if (enabled && action != null) onClick(x, y, w, h, action);
@@ -998,7 +1021,7 @@ public final class Ui {
     /** One of a set of choices, like monkeytype's: in the button shade, or the main colour when chosen. */
     public boolean choice(int x, int y, int w, int h, String label, boolean on, Runnable action) {
         int[] c = look(x, y, w, h, buttonColour(), on, true);
-        round(x, y, w, h, 3, c[0]);
+        shape(x, y, w, h, c[0], on, true);
         textCentred(fit(label, w - 6), x + w / 2, y + (h - lineH()) / 2 + 1, c[1]);
         if (action != null) onClick(x, y, w, h, action);
         return c[2] == 1;
@@ -1010,7 +1033,7 @@ public final class Ui {
      */
     public boolean choiceIn(UiFont.Face face, int x, int y, int w, int h, String label, boolean on, Runnable action) {
         int[] c = look(x, y, w, h, buttonColour(), on, true);
-        round(x, y, w, h, 3, c[0]);
+        shape(x, y, w, h, c[0], on, true);
         float raw = face == null ? tr.getWidth(label) : face.width(tr, label);
         int tw = Math.round(raw * scale);
         int tx = x + (w - tw) / 2, ty = y + (h - lineH()) / 2 + 1;
@@ -1031,7 +1054,7 @@ public final class Ui {
     /** A square button with a plus or minus on it, drawn rather than written so it fits any size. */
     public boolean stepButton(int x, int y, int size, boolean plus, Runnable action) {
         int[] c = look(x, y, size, size, buttonColour(), false, true);
-        round(x, y, size, size, 3, c[0]);
+        shape(x, y, size, size, c[0], false, true);
         plusMinus(x + size / 2, y + size / 2, Math.max(3, size / 2 - 1), plus, c[1]);
         if (action != null) onClick(x, y, size, size, action);
         return c[2] == 1;
@@ -1040,7 +1063,7 @@ public final class Ui {
     /** A tab with an item and a label, as the dock's panel buttons are, the item sized to fit. */
     public boolean tab(int x, int y, int w, int h, ItemStack icon, int iconSize, String label, boolean on, Runnable action) {
         int[] c = look(x, y, w, h, buttonColour(), on, true);
-        round(x, y, w, h, 3, c[0]);
+        shape(x, y, w, h, c[0], on, true);
         // The item and label together, centred in the tab; no item when icons are hidden.
         int inner = iconSize > 0 ? iconSize + 4 + width(label) : width(label);
         int ix = x + (w - inner) / 2;
@@ -1106,7 +1129,7 @@ public final class Ui {
      */
     public boolean toggle(int x, int y, int w, int h, String label, boolean on, Runnable action) {
         int[] c = look(x, y, w, h, buttonColour(), on, true);
-        round(x, y, w, h, 3, c[0]);
+        shape(x, y, w, h, c[0], on, true);
         textCentred(fit(label, w - 6), x + w / 2, y + (h - lineH()) / 2 + 1, c[1]);
         if (action != null) onClick(x, y, w, h, action);
         return c[2] == 1;
@@ -1115,7 +1138,7 @@ public final class Ui {
     /** A square button with an item for its picture, as the creative menu's tabs have. */
     public boolean iconButton(int x, int y, int size, ItemStack icon, boolean on, String tip, Runnable action) {
         int[] c = look(x, y, size, size, buttonColour(), on, true);
-        round(x, y, size, size, 3, c[0]);
+        shape(x, y, size, size, c[0], on, true);
         item(icon, x + (size - 16) / 2, y + (size - 16) / 2);
         if (c[2] == 1 && tip != null) tooltip(tip);
         if (action != null) onClick(x, y, size, size, action);

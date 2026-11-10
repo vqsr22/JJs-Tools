@@ -58,8 +58,22 @@ public class WJJSlider extends WSlider implements JJWidget {
         // Meteor draws all plain quads before all textures, so the track's rounded ends (textures)
         // landed on top of the thumb's body (plain quads) as a dark line whenever the thumb sat over
         // an end. Starting a clip draws everything so far first, so the thumb now goes on top.
+        // While dragged it follows the mouse exactly, and stretches up to 12% along the way it is
+        // moving, by how fast, settling back to round when it stops.
+        double knob = handleSize();
+        double now = dev.jjstools.util.Motion.now();
+        double ms = lastFrame == 0 ? 16 : Math.max(1, now - lastFrame);
+        double speed = Math.abs(valueWidth - lastValueWidth) / ms;   // pixels per millisecond
+        lastFrame = now;
+        lastValueWidth = valueWidth;
+        double target = dragging && !dev.jjstools.util.Motion.off() ? Math.min(1, speed / Math.max(0.05, knob * 0.02)) : 0;
+        stretch = dev.jjstools.util.Motion.off() ? 0 : stretch + (target - stretch) * (1 - Math.exp(-ms / dev.jjstools.util.Motion.ms(60)));
+        double w = knob * (1 + 0.12 * stretch);
+        double kx = Math.max(x, Math.min(x + width - w, x + valueWidth + knob / 2 - w / 2));
         renderer.scissorStart(x, y, width, height);
-        round(renderer, x + valueWidth, y, handleSize(), height, height / 2, theme.sliderHandle.get(dragging, handleMouseOver));
+        round(renderer, kx, y, w, height, height / 2, theme.sliderHandle.get(dragging, handleMouseOver));
         renderer.scissorEnd();
     }
+
+    private double lastValueWidth, lastFrame, stretch;
 }

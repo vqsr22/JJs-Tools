@@ -16,6 +16,29 @@ public class WJJDropdown<T> extends WDropdown<T> implements JJWidget {
         super(values, value);
     }
 
+    private boolean wasExpanded;
+    private double changedAt = -1e9;
+
+    /**
+     * The list opens downwards out of the dropdown over 200 milliseconds, easing out, and folds
+     * back into it a fifth quicker, easing in. Meteor shows the list as far down as this progress
+     * goes, so the list is revealed from the dropdown itself rather than appearing all at once.
+     */
+    @Override
+    public boolean render(GuiRenderer renderer, double mouseX, double mouseY, double delta) {
+        if (expanded != wasExpanded) {
+            wasExpanded = expanded;
+            changedAt = dev.jjstools.util.Motion.now();
+        }
+        double progress = expanded ? dev.jjstools.util.Motion.enter(changedAt, 0) : dev.jjstools.util.Motion.exit(changedAt);
+        // Meteor moves the progress on by its own step before drawing; starting a step back
+        // leaves it where this put it, so the list is still drawn while it closes.
+        animProgress = Math.max(0, Math.min(1, progress - (expanded ? 1 : -1) * delta * 14));
+        boolean result = super.render(renderer, mouseX, mouseY, delta);
+        animProgress = progress;
+        return result;
+    }
+
     @Override
     protected WDropdownRoot createRootWidget() {
         return new WRoot();

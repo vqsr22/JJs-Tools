@@ -443,6 +443,8 @@ public final class PearlThrower {
                         return;
                     }
                     water = waterOf(chamber);
+                    // Water out of sight under a shut trapdoor: the pearl goes where the trapdoor is.
+                    if (water == null) water = chamber;
                     stand = standSpot(chamber);
                 }
                 // Facing the trapdoor the whole time you wait, so anything dropped to make room
@@ -804,6 +806,11 @@ public final class PearlThrower {
      */
     private BlockPos findChamber(BlockPos around) {
         if (around == null) return null;
+        // Standing on the trapdoor itself (it is shut, so you land on it): that is the chamber,
+        // whether or not its water can be seen from here.
+        for (BlockPos p : new BlockPos[] { around, around.down(), mc.player.getBlockPos(), mc.player.getBlockPos().down() }) {
+            if (mc.world.getBlockState(p).getBlock() instanceof TrapdoorBlock) return p.toImmutable();
+        }
         BlockPos best = null;
         double bestDist = Double.MAX_VALUE;
         for (int dx = -4; dx <= 4; dx++) {
@@ -830,11 +837,15 @@ public final class PearlThrower {
 
     /**
      * The chamber's water: in the trapdoor's own block, under it (the usual build, a hole of
-     * water in the floor with the trapdoor standing open above it), or beside it. Null if none.
+     * water in the floor with the trapdoor standing open above it, sometimes a few blocks
+     * down), or beside it. Null if none.
      */
     private BlockPos waterOf(BlockPos trapdoor) {
         if (water(trapdoor)) return trapdoor;
-        if (water(trapdoor.down())) return trapdoor.down();
+        // Under it, up to a few blocks down for a chamber whose water sits lower.
+        for (int down = 1; down <= 3; down++) {
+            if (water(trapdoor.down(down))) return trapdoor.down(down);
+        }
         for (Direction d : Direction.Type.HORIZONTAL) {
             if (water(trapdoor.offset(d))) return trapdoor.offset(d);
         }

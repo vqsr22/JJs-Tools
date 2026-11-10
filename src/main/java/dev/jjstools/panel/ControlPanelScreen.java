@@ -105,6 +105,7 @@ public class ControlPanelScreen extends Screen {
         dockH = Math.max(DOCK_MIN, Math.min(DOCK_MAX, prefs.dockHeight));
         dockSide = sideIndex(prefs.dockSide);
 
+        int opened = 0;
         for (int i = 0; i < panels.size(); i++) {
             Panel p = panels.get(i);
             Prefs.Window win = prefs.windows.get(p.id);
@@ -121,7 +122,12 @@ public class ControlPanelScreen extends Screen {
             keepOnScreen(p);
             p.restore = null;
             if (win.maximised) maximise(p);
-            if (p.open) p.shown();
+            if (p.open) {
+                p.shown();
+                // Opening the panel brings the windows in one after another.
+                p.shownAt = dev.jjstools.util.Motion.now();
+                p.delay = opened++ * dev.jjstools.util.Motion.STAGGER_MS;
+            }
         }
     }
 
@@ -307,20 +313,52 @@ public class ControlPanelScreen extends Screen {
         drawWatermark();
 
         for (Panel p : order) {
-            if (!p.open) continue;
-            boolean active = !overDock && !settingsOpen && p == under && (dragging == null || dragging == p);
+            boolean closing = !p.open && dev.jjstools.util.Motion.leaving(p.hiddenAt);
+            if (!p.open && !closing) continue;
+            boolean active = p.open && !overDock && !settingsOpen && p == under && (dragging == null || dragging == p);
             ui.mx = active ? mouseX : -1;
             ui.my = active ? mouseY : -1;
+            // Growing out of its dock button as it opens, easing out, and shrinking back into it,
+            // a fifth quicker, as it closes: from 95% of its size and a little way towards the button.
+            double k = p.open ? dev.jjstools.util.Motion.enter(p.shownAt, p.delay) : dev.jjstools.util.Motion.exit(p.hiddenAt);
+            if (k >= 1) {
+                drawWindow(p);
+                continue;
+            }
+            float cx = p.x + p.w / 2F, cy = p.y + p.h / 2F;
+            float s = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * k);
+            float pull = (float) ((1 - k) * 0.15);
+            var m = context.getMatrices();
+            m.pushMatrix();
+            m.translate(cx + (p.tabX - cx) * pull, cy + (p.tabY - cy) * pull);
+            m.scale(s, s);
+            m.translate(-cx, -cy);
             drawWindow(p);
+            m.popMatrix();
         }
 
         applyEditedSetting();
         // The font previews are only kept while the font page is open.
         if (!(settingsOpen && settingsTab == 2)) UiFont.dropPreviews();
-        if (settingsOpen) {
-            ui.mx = mouseX;
-            ui.my = mouseY;
-            drawSettings(prefs, theme);
+        boolean settingsClosing = !settingsOpen && dev.jjstools.util.Motion.leaving(settingsAt);
+        if (settingsOpen || settingsClosing) {
+            ui.mx = settingsOpen ? mouseX : -1;
+            ui.my = settingsOpen ? mouseY : -1;
+            // Out of its button and back into it, as the windows do.
+            double k = settingsOpen ? dev.jjstools.util.Motion.enter(settingsAt, 0) : dev.jjstools.util.Motion.exit(settingsAt);
+            if (k >= 1) {
+                drawSettings(prefs, theme);
+            } else {
+                float s = (float) (dev.jjstools.util.Motion.POPOVER_START + (1 - dev.jjstools.util.Motion.POPOVER_START) * k);
+                float cx = vw / 2F, cy = vh / 2F, pull = (float) ((1 - k) * 0.15);
+                var m = context.getMatrices();
+                m.pushMatrix();
+                m.translate(cx + (settingsTabX - cx) * pull, cy + (settingsTabY - cy) * pull);
+                m.scale(s, s);
+                m.translate(-cx, -cy);
+                drawSettings(prefs, theme);
+                m.popMatrix();
+            }
         }
 
         context.getMatrices().popMatrix();
@@ -361,13 +399,20 @@ public class ControlPanelScreen extends Screen {
         int tabW = 0;
         for (Panel p : panels) tabW = Math.max(tabW, ui.tabWidth(p.title, icon) + 6);
         for (Panel p : panels) {
+            p.tabX = x + tabW / 2F;
+            p.tabY = y + size / 2F;
             ui.tab(x, y, tabW, size, p.icon, icon, p.title, p.open, () -> toggleWindow(p));
             x += tabW + 3;
         }
 
         // Right side: everything else lives in settings.
         int gw = ui.width("settings") + 24;
-        ui.toggle(vw - 6 - gw, y, gw, size, "settings", settingsOpen, () -> settingsOpen = !settingsOpen);
+        settingsTabX = vw - 6 - gw / 2F;
+        settingsTabY = y + size / 2F;
+        ui.toggle(vw - 6 - gw, y, gw, size, "settings", settingsOpen, () -> {
+            settingsOpen = !settingsOpen;
+            settingsAt = dev.jjstools.util.Motion.now();
+        });
     }
 
     private static String watermark;
@@ -387,11 +432,18 @@ public class ControlPanelScreen extends Screen {
         ui.small(watermark, x, y, ui.fgDim());
     }
 
+    private double settingsAt = -1e9;
+    private float settingsTabX, settingsTabY;
+
     private void toggleWindow(Panel p) {
         p.open = !p.open;
         if (p.open) {
             toFront(p);
             p.shown();
+            p.shownAt = dev.jjstools.util.Motion.now();
+            p.delay = 0;
+        } else {
+            p.hiddenAt = dev.jjstools.util.Motion.now();
         }
         remember();
     }
@@ -809,6 +861,7 @@ public class ControlPanelScreen extends Screen {
         });
         ui.closeButton(p.id, closeX, p.y + (barH - cs) / 2, cs, () -> {
             p.open = false;
+            p.hiddenAt = dev.jjstools.util.Motion.now();
             remember();
         });
 
