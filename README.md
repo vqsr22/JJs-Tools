@@ -49,6 +49,7 @@ Credit to lambda and stardust for some modules
 | **Control Panel** | A monkeytype-style screen with chat, stashes, encounters, pearlbots, player lookup, deaths, session stats and your ender chest, 187 themes and custom fonts. Also adds JJ's theme and Themes and Fonts tabs to Meteor's GUI |
 | **Custom Trims** | Client side armour trims on your own armour |
 | **Elytra Takeoff** | Takes off with an elytra and rocket on one key |
+| **Encumbering Stone** | Throws items you pick up straight back out, in front of or behind you, and stops you throwing items away, each with its own all, blacklist or whitelist |
 | **Farm Aura** | Tills and plants farmland around you |
 | **Fast Rename** | Renames items in bulk at an anvil |
 | **Friend Sync** | Copies your Meteor friends into other clients by running their friend commands for you |
