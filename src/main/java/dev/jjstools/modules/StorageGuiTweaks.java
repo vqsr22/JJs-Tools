@@ -420,7 +420,7 @@ public class StorageGuiTweaks extends Module {
     private final Setting<Boolean> pixelPerfect = sgIcons.add(new BoolSetting.Builder()
         .name("aliasing")
         .description("Keep the icon's pixels square and even. An item is 16 pixels of art, and at most sizes those cannot be shared out evenly over the screen pixels, so some come out doubled and some not, which looks wonky. This rounds the size to the nearest one where every pixel of art is the same whole number of screen pixels, and puts it on a whole screen pixel. Which sizes those are depends on your GUI scale: at scale 2 only 8 and 16, at scale 4 also 4 and 12.")
-        .defaultValue(true)
+        .defaultValue(false)
         .build()
     );
 
