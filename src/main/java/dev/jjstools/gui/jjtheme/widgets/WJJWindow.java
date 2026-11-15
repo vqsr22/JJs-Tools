@@ -79,11 +79,29 @@ public class WJJWindow extends WWindow implements JJWidget {
         meteordevelopment.meteorclient.gui.widgets.WWidget w = inside;
         while (w != null && !(w instanceof WJJWindow)) w = w.parent;
         if (!(w instanceof WJJWindow window) || !(window.parent instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer row)) return 0;
-        int index = 0;
+        // Counted by place on screen: columns stacked one under another share a place, so the
+        // column after a stack is one along, not one along for every window in the stack.
+        java.util.List<Double> lefts = new java.util.ArrayList<>();
         for (var cell : row.cells) {
-            if (cell.widget() instanceof WJJWindow other && other != window && other.isModuleColumn() && other.x < window.x) index++;
+            if (cell.widget() instanceof WJJWindow other && other != window && other.isModuleColumn() && other.x < window.x - 1) {
+                boolean known = false;
+                for (double l : lefts) if (Math.abs(l - other.x) <= 1) { known = true; break; }
+                if (!known) lefts.add(other.x);
+            }
         }
-        return index;
+        return lefts.size();
+    }
+
+    /** The top of the highest module column in the row the given widget is in, or its own top if none. */
+    public static double columnsTop(meteordevelopment.meteorclient.gui.widgets.WWidget inside) {
+        meteordevelopment.meteorclient.gui.widgets.WWidget w = inside;
+        while (w != null && !(w instanceof WJJWindow)) w = w.parent;
+        if (!(w instanceof WJJWindow window) || !(window.parent instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer row)) return inside.y;
+        double top = window.y;
+        for (var cell : row.cells) {
+            if (cell.widget() instanceof WJJWindow other && other.isModuleColumn()) top = Math.min(top, other.y);
+        }
+        return top;
     }
 
     /** How far the grabbable strip reaches, in and below the bottom edge: generous, so it is easy to catch. */
@@ -299,7 +317,12 @@ public class WJJWindow extends WWindow implements JJWidget {
         if (column) {
             double opened = dev.jjstools.util.Motion.openedAt(net.minecraft.client.MinecraftClient.getInstance().currentScreen);
             if (dev.jjstools.util.Motion.now() - opened < 1500) {
-                double in = dev.jjstools.util.Motion.enter(opened, columnIndex(this) * dev.jjstools.util.Motion.STAGGER_MS);
+                // A window stacked under another comes in when the rows above it have, not with
+                // the top of its stack.
+                double unit = header != null && header.height > 0 ? header.height : theme.scale(20);
+                int down = (int) Math.round(Math.max(0, y - columnsTop(this)) / unit);
+                double in = dev.jjstools.util.Motion.enter(opened,
+                    (columnIndex(this) + Math.min(down, 24)) * dev.jjstools.util.Motion.STAGGER_MS);
                 rise = Math.round((1 - in) * theme.scale(10));
             }
         }

@@ -20,6 +20,7 @@ public class Incognito extends Module {
 
     private final SettingGroup sgCoords = settings.createGroup("Coord hider");
     private final SettingGroup sgMap = settings.createGroup("Map hider");
+    private final SettingGroup sgXaero = settings.createGroup("Xaero's maps");
 
     // Coordinate patch
 
@@ -71,6 +72,19 @@ public class Incognito extends Module {
 
     private final Setting<SettingColor> mapColour = sgMap.add(new ColorSetting.Builder()
         .name("map-colour").defaultValue(new SettingColor(0, 0, 0, 255)).visible(mapOn::get).build());
+
+    // Xaero's maps
+
+    private final Setting<Boolean> hideXaero = sgXaero.add(new BoolSetting.Builder()
+        .name("hide-xaero-info")
+        .description("While this is on, turns off Xaero's World Map cursor coordinates and the waypoints on Xaero's minimap and world map. Xaero's own settings are not changed, so they come back when this is turned off.")
+        .defaultValue(true)
+        .build());
+
+    /** Whether Xaero's cursor coordinates and map waypoints are hidden while this is on. */
+    public boolean hidesXaero() {
+        return hideXaero.get();
+    }
 
     public Incognito() {
         super(JJsTools.CATEGORY, "incognito", "Covers your coordinates and minimap for screenshots and streaming.");

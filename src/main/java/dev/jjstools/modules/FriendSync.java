@@ -63,6 +63,8 @@ public class FriendSync extends Module {
     private final Deque<String> queue = new ArrayDeque<>();
     private int wait;
     private int checkIn;
+    /** Remove all was pressed: send the removes, add nothing back, and turn off once done. */
+    private boolean removingAll;
 
     public FriendSync() {
         super(JJsTools.CATEGORY, "friend-sync", "Copies your Meteor friends into other clients by running their friend commands for you.");
@@ -70,16 +72,27 @@ public class FriendSync extends Module {
 
     @Override
     public void onActivate() {
-        queue.clear();
+        if (!removingAll) queue.clear();
         checkIn = 0;
+    }
+
+    @Override
+    public void onDeactivate() {
+        removingAll = false;
     }
 
     @EventHandler
     private void onTick(TickEvent.Post event) {
         if (mc.player == null || mc.getNetworkHandler() == null) return;
 
+        if (removingAll && queue.isEmpty() && wait <= 0) {
+            info("Removed every friend from your other clients. Friend Sync is off so it does not add them back.");
+            toggle();
+            return;
+        }
+
         // Once a second: anyone new to send, anyone gone to take off.
-        if (--checkIn <= 0) {
+        if (!removingAll && --checkIn <= 0) {
             checkIn = 20;
             compare();
         }
@@ -147,7 +160,30 @@ public class FriendSync extends Module {
             synced.clear();
             checkIn = 0;
         };
+        WButton removeAll = row.add(theme.button("remove all")).widget();
+        removeAll.action = this::removeAll;
         return box;
+    }
+
+    /**
+     * Takes every friend off the other clients with their remove commands. Meteor's own friends
+     * list is left alone, so Friend Sync then turns itself off rather than add them all back; it
+     * turns on first if it was off, so the commands can go out.
+     */
+    private void removeAll() {
+        if (removeCommands.get().stream().allMatch(String::isBlank)) {
+            warning("Add your other client's remove command to remove-commands first.");
+            return;
+        }
+        Set<String> names = new LinkedHashSet<>();
+        for (Friend friend : Friends.get()) names.add(friend.getName());
+        for (String name : synced) if (names.stream().noneMatch(n -> n.equalsIgnoreCase(name))) names.add(name);
+        queue.clear();
+        for (String name : names) queueAll(removeCommands.get(), name);
+        synced.clear();
+        removingAll = true;
+        if (!isActive()) toggle();
+        info("Removing %d friends from your other clients.", names.size());
     }
 
     @Override

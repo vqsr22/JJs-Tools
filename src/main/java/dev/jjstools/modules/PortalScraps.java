@@ -142,6 +142,17 @@ public class PortalScraps extends Module {
         .description("Skip lumps containing crying obsidian, which every ruined portal has and player builds almost never do.")
         .defaultValue(true).build());
 
+    private final Setting<Boolean> ignoreRoads = sgFilter.add(new BoolSetting.Builder()
+        .name("ignore-roads")
+        .description("Skip long, flat, narrow strips of obsidian: highways and ring roads at any distance, including stretches outside the known ring road radii.")
+        .defaultValue(true).build());
+
+    private final Setting<Integer> roadLength = sgFilter.add(new IntSetting.Builder()
+        .name("road-min-length")
+        .description("How long a flat strip has to be, in blocks, before it counts as a road.")
+        .defaultValue(16).min(6).sliderRange(8, 64)
+        .visible(ignoreRoads::get).build());
+
     private final Setting<Boolean> onlyOnTrails = sgFilter.add(new BoolSetting.Builder()
         .name("only-on-trails")
         .description("Only scan where someone has actually been. A chunk that already existed was loaded by a player at some point, whether that was in 1.12 or 1.19; virgin terrain is skipped. Needs XaeroPlus with its Palette New Chunks module switched on, or it hides everything.")
@@ -486,6 +497,8 @@ public class PortalScraps extends Module {
 
         if (cluster.size() < minCluster.get()) return;
 
+        if (ignoreRoads.get() && looksLikeRoad(cluster.size(), minX, minY, minZ, maxX, maxY, maxZ)) return;
+
         if (ignoreRuinedPortals.get()) {
             // Checked before the expensive test: a lump next to one we have already written off
             // needs no further examination.
@@ -506,6 +519,24 @@ public class PortalScraps extends Module {
         }
 
         report(origin, find);
+    }
+
+    /**
+     * Is this lump a stretch of road?
+     *
+     * Roads are flat, long and narrow. A straight one is long one way and narrow the other; a
+     * diagonal one spans a big square box but fills little of it. Both come down to the same
+     * test: flat, long enough, and on average no wider than a road along its length. A solid
+     * floor or platform is far too wide on average to pass.
+     */
+    private boolean looksLikeRoad(int blocks, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+        int height = maxY - minY + 1;
+        if (height > 3) return false;
+        int longest = Math.max(maxX - minX, maxZ - minZ) + 1;
+        if (longest < roadLength.get()) return false;
+        // Widest a road usually is: a few blocks, or a dozen counting the walls and rails some have.
+        int roadWidth = 12;
+        return blocks <= (long) longest * roadWidth * height;
     }
 
     /**

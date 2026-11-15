@@ -104,25 +104,19 @@ public class WJJModule extends WPressable implements JJWidget {
         renderer.text(shown, x, by + pad, faded(theme.ink(pressed || mouseOver || on), in), false);
     }
 
-    private int row = -1;
-
     /**
      * How far in this row is, 0 to 1, after the screen opens: its column a moment after the one
-     * to its left, and each row in it a moment after the one above, so the list settles in
-     * order. Only the first dozen rows wait; the rest come in with the twelfth.
+     * to its left, and each row a moment after the one above it on screen, so the list settles
+     * in the order you read it. Rows are counted by where they actually are, so a window stacked
+     * under another carries on after the one above rather than starting again alongside it.
+     * Only the first couple of dozen rows wait; the rest come in with those.
      */
     private double entrance() {
-        if (row < 0 && parent instanceof meteordevelopment.meteorclient.gui.widgets.containers.WContainer c) {
-            row = 0;
-            for (var cell : c.cells) {
-                if (cell.widget() == this) break;
-                row++;
-            }
-        }
         double opened = dev.jjstools.util.Motion.openedAt(mc.currentScreen);
         if (dev.jjstools.util.Motion.now() - opened > 1500) return 1;
+        int row = height > 0 ? (int) Math.round((y - WJJWindow.columnsTop(this)) / height) : 0;
         double delay = WJJWindow.columnIndex(this) * dev.jjstools.util.Motion.STAGGER_MS
-            + Math.min(Math.max(row, 0), 12) * dev.jjstools.util.Motion.STAGGER_MS;
+            + Math.min(Math.max(row, 0), 24) * dev.jjstools.util.Motion.STAGGER_MS;
         return dev.jjstools.util.Motion.enter(opened, delay);
     }
 

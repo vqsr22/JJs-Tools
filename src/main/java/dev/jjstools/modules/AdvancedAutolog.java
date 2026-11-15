@@ -256,6 +256,14 @@ public class AdvancedAutolog extends Module {
             .range(8, 5000).sliderRange(16, 500).defaultValue(64)
             .build()
     );
+    private final Setting<Boolean> pearlPullIgnoreInRender = sgAutoLog.add(
+        new BoolSetting.Builder()
+            .name("ignore-pulls-in-render-distance")
+            .description("Does not log out for a teleport that lands you within your render distance, such as one of your own pearls landing nearby. A stasis chamber worth worrying about is further away than that.")
+            .visible(pearlPullAutoLog::get)
+            .defaultValue(true)
+            .build()
+    );
 
     private final Setting<Boolean> crystalAutoLog = sgAutoLog.add(
         new BoolSetting.Builder()
@@ -1262,6 +1270,10 @@ public class AdvancedAutolog extends Module {
     private void checkPearlPull(PlayerPositionLookS2CPacket packet) {
         if (!pearlPullAutoLog.get() || mc.player == null || pullQuiet > 0) return;
         if (pendingReason != null) return;
+        // Dead or just respawned: the teleport is the respawn, not a pull.
+        if (mc.player.isDead() || mc.player.getHealth() <= 0) return;
+        // A portal: the world already changed before the tick loop noticed.
+        if (mc.world != null && pullDimension != null && mc.world.getRegistryKey() != pullDimension) return;
 
         // Nothing to compare against until the tick loop has run at least once in this world,
         // which it has not during a queue or on the first frames after joining.
@@ -1278,6 +1290,11 @@ public class AdvancedAutolog extends Module {
 
         double distance = current.distanceTo(target);
         if (distance < pearlPullDistance.get()) return;
+        if (pearlPullIgnoreInRender.get()) {
+            // Measured flat, as render distance is: chunks across, not up.
+            double flat = Math.hypot(target.x - current.x, target.z - current.z);
+            if (flat <= mc.options.getClampedViewDistance() * 16.0) return;
+        }
 
         requestLogout(Text.literal("§8[§5Advanced Autolog§8] §fDisconnected you because something pulled you §5"
             + Math.round(distance) + "§f blocks§c!"), forceKick.get());
@@ -1285,6 +1302,13 @@ public class AdvancedAutolog extends Module {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onPacketReceive(PacketEvent.Receive event) {
+        // Changing dimension and respawning after a death both arrive as a respawn, ahead of the
+        // position packet that moves you, so the quiet period starts here rather than a tick late.
+        if (event.packet instanceof net.minecraft.network.packet.s2c.play.PlayerRespawnS2CPacket) {
+            pullQuiet = SETTLE_TICKS;
+            pullDimension = null;
+            return;
+        }
         if (event.packet instanceof PlayerPositionLookS2CPacket position) {
             checkPearlPull(position);
             return;

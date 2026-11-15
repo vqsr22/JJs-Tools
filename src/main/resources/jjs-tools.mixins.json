@@ -64,6 +64,7 @@
 		"WidgetScreenAccessor",
 		"WindowBorderlessMixin",
 		"WorldMixin",
+		"XaeroConfigMixin",
 		"accessor.AnvilScreenAccessor",
 		"accessor.AnvilScreenHandlerAccessor",
 		"accessor.BlockItemInvoker",

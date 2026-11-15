@@ -7,6 +7,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Catches a module as it is registered, which is the only moment a name clash can still be fixed.
@@ -24,5 +25,21 @@ public class ModulesAddMixin {
     @Inject(method = "add(Lmeteordevelopment/meteorclient/systems/modules/Module;)V", at = @At("HEAD"))
     private void jjsTools$beforeAdd(Module module, CallbackInfo ci) {
         ModuleRenames.onRegister(module);
+    }
+
+    /** See ModuleConfigBackup: what Meteor's saved file has, before it loads it. */
+    @Inject(method = "fromTag", at = @At("HEAD"))
+    private void jjsTools$beforeLoad(net.minecraft.nbt.NbtCompound tag, CallbackInfoReturnable<Modules> cir) {
+        dev.jjstools.util.ModuleConfigBackup.beforeLoad(tag);
+    }
+
+    @Inject(method = "fromTag", at = @At("RETURN"))
+    private void jjsTools$afterLoad(net.minecraft.nbt.NbtCompound tag, CallbackInfoReturnable<Modules> cir) {
+        dev.jjstools.util.ModuleConfigBackup.afterLoad();
+    }
+
+    @Inject(method = "toTag", at = @At("RETURN"))
+    private void jjsTools$afterSave(CallbackInfoReturnable<net.minecraft.nbt.NbtCompound> cir) {
+        dev.jjstools.util.ModuleConfigBackup.afterSave(cir.getReturnValue());
     }
 }

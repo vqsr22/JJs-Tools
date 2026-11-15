@@ -25,6 +25,14 @@ base {
 
 apply from: 'gradle/versioned.gradle'
 
+// Compile-only stand-ins for classes of optional mods (Xaero's), so mixins can name them. They are
+// not packaged: the real classes come from the mods when they are installed.
+sourceSets {
+	stubs {
+		java.srcDirs = ['src/stubs/java']
+	}
+}
+
 repositories {
 	mavenCentral()
 	maven {
@@ -38,6 +46,7 @@ repositories {
 }
 
 dependencies {
+	compileOnly sourceSets.stubs.output
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 
 	// Meteor 1.21.11 is still on Yarn, so this addon has to be too.
