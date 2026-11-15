@@ -65,6 +65,7 @@ Credit to lambda and stardust for some modules
 | **Portal Scraps** | Finds leftover obsidian in the Nether |
 | **Printer Go Brrr** | Builds Litematica schematics as you walk past. Needs Litematica |
 | **Rare Item Highlighter** | Highlights rare items in containers |
+| **Rocket Obstacle Passer** | Puts on an elytra and flies along a highway at rocket speed, steering through the gaps in whatever is clogging it |
 | **Rubberband Notifier** | Reports lagbacks |
 | **Shulker Dyer** | Dyes shulker boxes and bundles in crafting grids |
 | **Sign to Item Frame** | Shows the item a sign names on the sign |
