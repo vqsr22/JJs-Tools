@@ -301,12 +301,40 @@ public class ModuleWheel extends Module {
         checkKey();
     }
 
+    /**
+     * Opens on the press itself, so a quick press between two checks is never missed. A wheel
+     * still shrinking away from the last choice is replaced, rather than the press being lost
+     * while it closes.
+     */
+    @EventHandler
+    private void onKey(meteordevelopment.meteorclient.events.meteor.KeyEvent event) {
+        if (event.action == meteordevelopment.meteorclient.utils.misc.input.KeyAction.Press
+            && dev.jjstools.compat.Compat.matches(wheelKey.get(), event)) open();
+    }
+
+    @EventHandler
+    //#if MC >= 1.21.9
+    private void onMouse(meteordevelopment.meteorclient.events.meteor.MouseClickEvent event) {
+    //#else
+    //$$ private void onMouse(meteordevelopment.meteorclient.events.meteor.MouseButtonEvent event) {
+    //#endif
+        if (event.action == meteordevelopment.meteorclient.utils.misc.input.KeyAction.Press
+            && dev.jjstools.compat.Compat.matches(wheelKey.get(), event)) open();
+    }
+
+    /** The backstop for the events above: opens on the key going down, seen every tick and frame. */
     private void checkKey() {
         boolean down = wheelKey.get().isSet() && wheelKey.get().isPressed();
-        if (down && !wasDown && mc.currentScreen == null && !slots().isEmpty()) {
-            mc.setScreen(new WheelScreen());
-        }
+        if (down && !wasDown) open();
         wasDown = down;
+    }
+
+    private void open() {
+        wasDown = true;
+        boolean closing = mc.currentScreen instanceof WheelScreen wheel && wheel.done;
+        if (mc.currentScreen != null && !closing) return;
+        if (mc.player == null || slots().isEmpty()) return;
+        mc.setScreen(new WheelScreen());
     }
 
     private final class WheelScreen extends Screen {
