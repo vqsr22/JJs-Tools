@@ -1,6 +1,8 @@
 package dev.jjstools.modules;
 
 import dev.jjstools.JJsTools;
+import dev.jjstools.util.Ping;
+import dev.jjstools.util.XaeroWaypoints;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
@@ -24,6 +26,8 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.WorldChunk;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
 
 public class DripleafEsp extends Module {
@@ -33,6 +37,7 @@ public class DripleafEsp extends Module {
     private final SettingGroup visuals = this.settings.createGroup("Render");
     private final SettingGroup traces = this.settings.createGroup("Tracers");
     private final SettingGroup markers = this.settings.createGroup("Chunk");
+    private final SettingGroup alerts = this.settings.createGroup("Alerts");
 
     private final Setting<Integer> range = this.general.add(new IntSetting.Builder()
         .name("scan-range")
@@ -136,6 +141,87 @@ public class DripleafEsp extends Module {
         .build()
     );
 
+    private final Setting<Ping> ping = this.alerts.add(new EnumSetting.Builder<Ping>()
+        .name("ping")
+        .description("Sound played when new dripleaf is found. Off for none.")
+        .defaultValue(Ping.Pling)
+        .build()
+    );
+
+    private final Setting<Double> pingVolume = this.alerts.add(new DoubleSetting.Builder()
+        .name("ping-volume")
+        .description("How loud the ping is.")
+        .defaultValue(1)
+        .range(0, 2)
+        .sliderRange(0, 2)
+        .visible(() -> this.ping.get() != Ping.Off)
+        .build()
+    );
+
+    private final Setting<Boolean> waypoints = this.alerts.add(new BoolSetting.Builder()
+        .name("xaero-waypoints")
+        .description("Adds a waypoint in Xaero's Minimap (shown on the minimap and world map) where dripleaf is found.")
+        .defaultValue(true)
+        .build()
+    );
+
+    private final Setting<String> waypointName = this.alerts.add(new StringSetting.Builder()
+        .name("waypoint-name")
+        .description("Name of the waypoints.")
+        .defaultValue("Dripleaf")
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    private final Setting<String> waypointInitials = this.alerts.add(new StringSetting.Builder()
+        .name("waypoint-icon")
+        .description("The letters shown on the waypoint's icon, up to two.")
+        .defaultValue("D")
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    private final Setting<XaeroColour> waypointColour = this.alerts.add(new EnumSetting.Builder<XaeroColour>()
+        .name("waypoint-colour")
+        .description("Colour of the waypoints.")
+        .defaultValue(XaeroColour.Green)
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    private final Setting<Integer> waypointSpacing = this.alerts.add(new IntSetting.Builder()
+        .name("waypoint-spacing")
+        .description("Dripleaf within this many blocks of an existing waypoint shares it, so one patch gets one waypoint.")
+        .defaultValue(16)
+        .min(0)
+        .sliderRange(0, 64)
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    private final Setting<Boolean> temporary = this.alerts.add(new BoolSetting.Builder()
+        .name("temporary-waypoints")
+        .description("Temporary waypoints are not saved: they are gone when you leave. Off keeps them.")
+        .defaultValue(true)
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    private final Setting<Boolean> removeOnDisable = this.alerts.add(new BoolSetting.Builder()
+        .name("remove-on-disable")
+        .description("Removes the waypoints this added when the module is turned off.")
+        .defaultValue(true)
+        .visible(this.waypoints::get)
+        .build()
+    );
+
+    /** Dripleaf already pinged and given a waypoint (or a nearby one), so they are only reported once. */
+    private final it.unimi.dsi.fastutil.longs.LongOpenHashSet alerted = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+    /** Where this put waypoints, and the waypoints themselves. */
+    private final List<BlockPos> waypointAt = new ArrayList<>();
+    private final List<XaeroWaypoints.Added> added = new ArrayList<>();
+    private boolean warnedNoXaero;
+
     private final Long2ObjectMap<LongArrayList> found = new Long2ObjectOpenHashMap<>();
     private final BlockPos.Mutable below = new BlockPos.Mutable();
     private World world;
@@ -143,7 +229,7 @@ public class DripleafEsp extends Module {
 
     public DripleafEsp() {
         super(JJsTools.CATEGORY, "dripleaf-esp",
-            "Highlights small dripleaf upper halves without matching lower halves."
+            "Highlights small dripleaf upper halves without matching lower halves, with a ping and a Xaero waypoint when found."
         );
     }
 
@@ -155,11 +241,21 @@ public class DripleafEsp extends Module {
     @Override
     public void onDeactivate() {
         this.reset();
+        if (this.removeOnDisable.get()) {
+            for (XaeroWaypoints.Added a : this.added) XaeroWaypoints.remove(a);
+        }
+        this.added.clear();
+        this.waypointAt.clear();
+        this.alerted.clear();
     }
 
     @EventHandler
     private void leave(GameLeftEvent event) {
         this.reset();
+        // Temporary waypoints go with the world; saved ones stay in Xaero.
+        this.added.clear();
+        this.waypointAt.clear();
+        this.alerted.clear();
     }
 
     @EventHandler
@@ -195,6 +291,48 @@ public class DripleafEsp extends Module {
 
         this.found.clear();
         this.found.putAll(result);
+        this.alert();
+    }
+
+    /** Pings once for any dripleaf not reported before, and puts a waypoint at each new patch. */
+    private void alert() {
+        boolean fresh = false;
+        int spacing = this.waypointSpacing.get();
+        long spacingSq = (long) spacing * spacing;
+        for (LongArrayList list : this.found.values()) {
+            for (int i = 0; i < list.size(); i++) {
+                long key = list.getLong(i);
+                if (!this.alerted.add(key)) continue;
+                fresh = true;
+                if (!this.waypoints.get()) continue;
+
+                BlockPos pos = BlockPos.fromLong(key);
+                boolean near = false;
+                for (BlockPos at : this.waypointAt) {
+                    if (at.getSquaredDistance(pos) <= spacingSq) {
+                        near = true;
+                        break;
+                    }
+                }
+                if (near) continue;
+
+                if (!XaeroWaypoints.installed()) {
+                    if (!this.warnedNoXaero) this.warning("Xaero's Minimap is not installed, so no waypoints.");
+                    this.warnedNoXaero = true;
+                    continue;
+                }
+                String initials = this.waypointInitials.get().trim();
+                if (initials.isEmpty()) initials = "D";
+                if (initials.length() > 2) initials = initials.substring(0, 2);
+                XaeroWaypoints.Added a = XaeroWaypoints.add(pos.getX(), pos.getY(), pos.getZ(), this.waypointName.get(),
+                    initials, this.waypointColour.get().ordinal(), this.temporary.get());
+                if (a != null) {
+                    this.added.add(a);
+                    this.waypointAt.add(pos);
+                }
+            }
+        }
+        if (fresh) this.ping.get().play(0, this.pingVolume.get());
     }
 
     private LongArrayList scan(WorldChunk chunk) {
@@ -288,6 +426,12 @@ public class DripleafEsp extends Module {
         this.found.clear();
         this.world = null;
         this.ticks = 0;
+    }
+
+    /** Xaero's waypoint colours, in its order. */
+    public enum XaeroColour {
+        Black, DarkBlue, DarkGreen, DarkAqua, DarkRed, DarkPurple, Gold, Gray,
+        DarkGray, Blue, Green, Aqua, Red, LightPurple, Yellow, White
     }
 
     public enum Height {
