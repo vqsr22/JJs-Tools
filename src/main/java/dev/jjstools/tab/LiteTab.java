@@ -378,7 +378,7 @@ public final class LiteTab {
     public static void drawQueuedText() {
         if (!queued) return;
         // Under Exordium it is drawn every frame from ScreenOverlay instead.
-        if (TabOptimizer.EXORDIUM) {
+        if (dev.jjstools.util.ExordiumFixes.active()) {
             queuedAt = System.nanoTime();
             return;
         }

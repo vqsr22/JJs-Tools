@@ -12,5 +12,8 @@ public class JJsHud {
     public static void init() {
         Hud.get().register(CustomTextHud.INFO);
         Hud.get().register(CustomShapeHud.INFO);
+        Hud.get().register(PacketLimitsHud.INFO);
+        dev.jjstools.util.ExordiumFixes.init();
+        dev.jjstools.util.PacketLimits.init();
     }
 }

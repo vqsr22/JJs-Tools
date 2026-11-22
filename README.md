@@ -59,6 +59,7 @@ Credit to lambda and stardust for some modules
 | **Kit Creator** | Copies a shulker box layout into another one |
 | **Light Levels** | Shows where mobs can spawn, with a per-mob filter |
 | **Module Wheel** | Hold a key and let go over a module to toggle it or a command to run it, each with its own name and icon. Right-click and drag to rearrange |
+| **No Packet Kicks** | Keeps your global, inventory and interaction packets under the server's limits; at the inventory limit items cannot be moved until it drops. Comes with a Packet Limits HUD element |
 | **No Jolt** | Stops the health and hunger icons shaking |
 | **Optimise Tablist** | Makes the tab list cheap to draw, with an optional JJ's theme look |
 | **Pickup Loot Stream** | Shows what you pick up in a corner of the screen |
@@ -69,6 +70,7 @@ Credit to lambda and stardust for some modules
 | **Rubberband Notifier** | Reports lagbacks |
 | **Shulker Dyer** | Dyes shulker boxes and bundles in crafting grids |
 | **Sign to Item Frame** | Shows the item a sign names on the sign |
+| **Smoother Freecam** | Freecam that speeds up and glides to a stop like creative flight |
 | **Storage GUI Tweaks** | Previews container contents at your crosshair and in tooltips, and tints shulker GUIs |
 | **Team Trees** | Plants saplings |
 | **Unobtrusive** | Moves or hides overlays and hand animations in the middle of the screen |
@@ -87,7 +89,9 @@ Credit to lambda and stardust for some modules
 
 ## HUD elements
 
-**Custom Text** and **Custom Shape** (rectangle, ellipse, triangle or line).
+**Custom Text**, **Custom Shape** (rectangle, ellipse, triangle or line) and **Packet Limits** (global, inventory and interaction packets against the server's limits).
+
+The HUD tab also has an **exordium-fixes** switch, off by default: with Exordium installed it stops Meteor's HUD, other add-ons' HUD text, the crosshair preview, Incognito's covers and the tab list from flickering.
 
 ## Borderless windowed
 

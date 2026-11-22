@@ -715,7 +715,7 @@ public class StorageGuiTweaks extends Module {
         // Under Exordium this event only comes on the frames it lets the HUD draw, and what is
         // drawn here did not reach its saved copy at all, so the preview only showed with a
         // screen open. There it is drawn every frame from ScreenOverlay instead.
-        if (TabOptimizer.EXORDIUM) return;
+        if (dev.jjstools.util.ExordiumFixes.active()) return;
         renderPreview(event.drawContext, event.screenWidth);
     }
 

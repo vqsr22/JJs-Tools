@@ -103,7 +103,7 @@ public class Incognito extends Module {
     private void onRender2D(Render2DEvent event) {
         // Under Exordium this event only comes on the frames it lets the HUD draw, so the covers
         // flickered; there they are drawn every frame from ScreenOverlay instead.
-        if (dev.jjstools.modules.TabOptimizer.EXORDIUM) return;
+        if (dev.jjstools.util.ExordiumFixes.active()) return;
         drawCovers();
     }
 

@@ -106,17 +106,44 @@ public class WJJWindow extends WWindow implements JJWidget {
 
     /** How far the grabbable strip reaches, in and below the bottom edge: generous, so it is easy to catch. */
     private double gripInside() {
-        return Math.max(8, theme().unit() * 6);
+        return Math.max(6, theme().unit() * 4);
     }
 
     private double gripOutside() {
-        return Math.max(4, theme().unit() * 3);
+        return Math.max(3, theme().unit() * 2);
     }
 
     private boolean onGrip(double mx, double my) {
-        if (id == null || !expanded) return false;
+        if (id == null || !expanded || coveredAt(mx, my)) return false;
         double bottom = y + shownHeight();
         return mx >= x && mx <= x + width && my >= bottom - gripInside() && my <= bottom + gripOutside();
+    }
+
+    /**
+     * Whether a window drawn over this one covers the point. Meteor hands a click to its windows
+     * in the order it draws them, so the one at the back is asked first and could take a click
+     * meant for the one in front of it. A covered window is told the mouse is nowhere near it, so
+     * nothing in it lights up, takes the click or scrolls.
+     */
+    private boolean coveredAt(double mx, double my) {
+        if (!(parent instanceof WContainer row)) return false;
+        boolean above = false;
+        for (Cell<?> cell : row.cells) {
+            if (cell.widget() == this) {
+                above = true;
+                continue;
+            }
+            if (above && cell.widget() instanceof WWindow w && w.visible
+                && mx >= w.x && mx < w.x + w.width && my >= w.y && my < w.y + w.height) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void mouseMoved(double mouseX, double mouseY, double lastMouseX, double lastMouseY) {
+        // Mid-resize the real position is always wanted, covered or not.
+        if (!resizing && coveredAt(mouseX, mouseY)) mouseX = mouseY = -1e6;
+        super.mouseMoved(mouseX, mouseY, lastMouseX, lastMouseY);
     }
 
     // The mouse turns into an up-and-down arrow over the edge, so it is plain it can be dragged.

@@ -161,4 +161,14 @@ public final class Compat {
         //$$ return net.minecraft.sound.SoundEvents.ENTITY_ITEM_BREAK;
         //#endif
     }
+
+    /** How far between the last tick and the next this frame is drawn, 0 to 1. */
+    public static float tickDelta() {
+        var counter = net.minecraft.client.MinecraftClient.getInstance().getRenderTickCounter();
+        //#if MC >= 1.21.5
+        return counter.getTickProgress(true);
+        //#else
+        //$$ return counter.getTickDelta(true);
+        //#endif
+    }
 }

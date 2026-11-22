@@ -27,6 +27,8 @@ public class JJsTools extends MeteorAddon {
         Modules.get().add(new AutoOmen());
         Modules.get().add(new AntiRocketPlace());
         Modules.get().add(new AutoDoor());
+        Modules.get().add(new NoPacketKicks());
+        Modules.get().add(new SmootherFreecam());
         Modules.get().add(new EncumberingStone());
 
         Modules.get().add(new AdBlocker());

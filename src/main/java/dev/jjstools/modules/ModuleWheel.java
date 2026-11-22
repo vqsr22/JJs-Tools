@@ -42,6 +42,7 @@ public class ModuleWheel extends Module {
     private final Setting<List<Module>> modules = sgGeneral.add(new ModuleListSetting.Builder()
         .name("modules")
         .description("The modules on the wheel. Right-click and drag one in the wheel to move it.")
+        .onChanged(list -> refreshAfterPicker())
         .build()
     );
 
@@ -128,6 +129,27 @@ public class ModuleWheel extends Module {
             mc.send(screen::reload);
         }
         commandLines = count;
+    }
+
+    /** The module picker whose closing already reopens these settings, so it is only asked once. */
+    private meteordevelopment.meteorclient.gui.WidgetScreen pickerReloading;
+
+    /**
+     * Modules are chosen on a screen of their own, in front of these settings, so the icons below
+     * would still show the old list on coming back. Once a module is added or taken off there, the
+     * settings behind are laid out again as that screen closes, so every module on the wheel has
+     * its icon to set straight away.
+     */
+    private void refreshAfterPicker() {
+        if (!(mc.currentScreen instanceof meteordevelopment.meteorclient.gui.WidgetScreen picker)) return;
+        if (picker == pickerReloading) return;
+        if (picker.parent instanceof meteordevelopment.meteorclient.gui.WidgetScreen settingsScreen) {
+            pickerReloading = picker;
+            picker.onClosed(() -> mc.send(settingsScreen::reload));
+        } else {
+            // Changed from the settings themselves: lay them out again now.
+            mc.send(picker::reload);
+        }
     }
 
     /** The key was down last tick, so holding it after the wheel closes does not open it again. */

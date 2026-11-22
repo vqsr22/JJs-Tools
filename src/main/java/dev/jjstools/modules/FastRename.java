@@ -38,14 +38,15 @@ public class FastRename extends Module {
     private final Setting<List<Item>> itemList = settings.getDefaultGroup().add(
         new ItemListSetting.Builder()
             .name("items")
-            .description("Items to automatically rename (or exclude from being renamed, if blacklist mode is enabled.)")
+            .description("Items to automatically rename (or exclude from being renamed, if blacklist mode is enabled.) Each one listed can have a name of its own, set below the settings.")
+            .onChanged(list -> refreshAfterPicker())
             .build()
     );
 
     private final Setting<String> itemName = settings.getDefaultGroup().add(
         new StringSetting.Builder()
             .name("custom-name")
-            .description("The name you want to give to qualifying items.")
+            .description("The name for items without one of their own below, and for everything in blacklist mode.")
             .defaultValue("")
             .onChanged(name -> {
                 if (name.length() > AnvilScreenHandler.MAX_NAME_LENGTH) {
@@ -166,6 +167,96 @@ public class FastRename extends Module {
      */
     private static final int MAIN_INVENTORY_SIZE = 36;
 
+    /** Each listed item's own name, set under the settings. An empty or missing one uses custom-name. */
+    private final java.util.Map<Item, String> names = new java.util.HashMap<>();
+
+    /** The name an item of this kind is given. */
+    private String nameFor(Item item) {
+        if (!blacklistMode.get()) {
+            String own = names.get(item);
+            if (own != null && !own.isEmpty()) return own;
+        }
+        return itemName.get();
+    }
+
+    private boolean isTarget(Item item) {
+        return blacklistMode.get() != itemList.get().contains(item);
+    }
+
+    /** The module picker whose closing already redraws these settings, so it is only asked once. */
+    private meteordevelopment.meteorclient.gui.WidgetScreen pickerReloading;
+
+    /**
+     * Items are chosen on a screen of their own in front of these settings, so the rows below
+     * would still show the old list on coming back. Once one is added or taken off there, these
+     * settings are laid out again as it closes.
+     */
+    private void refreshAfterPicker() {
+        if (!(mc.currentScreen instanceof meteordevelopment.meteorclient.gui.WidgetScreen picker)) return;
+        if (picker == pickerReloading) return;
+        if (picker.parent instanceof meteordevelopment.meteorclient.gui.WidgetScreen settingsScreen) {
+            pickerReloading = picker;
+            picker.onClosed(() -> mc.send(settingsScreen::reload));
+        } else {
+            mc.send(picker::reload);
+        }
+    }
+
+    /** A row for every listed item: its icon, its name, and a box for what to rename it to. */
+    @Override
+    public meteordevelopment.meteorclient.gui.widgets.WWidget getWidget(meteordevelopment.meteorclient.gui.GuiTheme theme) {
+        var box = theme.verticalList();
+        if (itemList.get().isEmpty()) {
+            box.add(theme.label("Add items to the list above to give each its own name here."));
+            return box;
+        }
+        if (blacklistMode.get()) {
+            box.add(theme.label("In blacklist mode everything is renamed to custom-name."));
+            return box;
+        }
+        box.add(theme.label("Each item's new name. Leave one empty to use custom-name."));
+        var table = box.add(theme.table()).expandX().widget();
+        for (Item item : itemList.get()) {
+            table.add(theme.item(item.getDefaultStack()));
+            table.add(theme.label(item.getName().getString()));
+            var text = table.add(theme.textBox(names.getOrDefault(item, ""), itemName.get())).minWidth(160).expandX().widget();
+            text.action = () -> {
+                String name = text.get();
+                if (name.length() > AnvilScreenHandler.MAX_NAME_LENGTH) {
+                    MsgUtil.sendModuleMsg("§4Name for " + item.getName().getString() + " exceeds max accepted length§8..!", this.name);
+                }
+                if (name.isEmpty()) names.remove(item);
+                else names.put(item, name);
+                echoName(name);
+            };
+            table.row();
+        }
+        return box;
+    }
+
+    @Override
+    public net.minecraft.nbt.NbtCompound toTag() {
+        net.minecraft.nbt.NbtCompound tag = super.toTag();
+        if (tag == null) return null;
+        net.minecraft.nbt.NbtCompound saved = new net.minecraft.nbt.NbtCompound();
+        for (var e : names.entrySet()) saved.putString(net.minecraft.registry.Registries.ITEM.getId(e.getKey()).toString(), e.getValue());
+        tag.put("item-names", saved);
+        return tag;
+    }
+
+    @Override
+    public Module fromTag(net.minecraft.nbt.NbtCompound tag) {
+        super.fromTag(tag);
+        names.clear();
+        net.minecraft.nbt.NbtCompound saved = dev.jjstools.compat.Compat.nbtCompound(tag, "item-names");
+        for (String key : saved.getKeys()) {
+            var id = net.minecraft.util.Identifier.tryParse(key);
+            if (id == null || !net.minecraft.registry.Registries.ITEM.containsId(id)) continue;
+            names.put(net.minecraft.registry.Registries.ITEM.get(id), dev.jjstools.compat.Compat.nbtString(saved, key, ""));
+        }
+        return this;
+    }
+
     private int timer = 0;
     private boolean notified = false;
     private static final int ANVIL_OFFSET = 3;
@@ -229,12 +320,12 @@ public class FastRename extends Module {
         for (int n = 0; n < MAIN_INVENTORY_SIZE + ANVIL_OFFSET; n++) {
             if (n == AnvilScreenHandler.OUTPUT_ID) continue;
             ItemStack stack = handler.getSlot(n).getStack();
-            if ((blacklistMode.get() && !itemList.get().contains(stack.getItem()))
-                || (!blacklistMode.get() && itemList.get().contains(stack.getItem())))
-            {
-                if (itemName.get().isBlank() && stack.contains(DataComponentTypes.CUSTOM_NAME)) {
+            if (stack.isEmpty()) continue;
+            if (isTarget(stack.getItem())) {
+                String want = nameFor(stack.getItem());
+                if (want.isBlank() && stack.contains(DataComponentTypes.CUSTOM_NAME)) {
                     return renameNamed.get();
-                } else if (!stack.getName().getString().equals(itemName.get())) {
+                } else if (!stack.getName().getString().equals(want)) {
                     return renameNamed.get() || !stack.contains(DataComponentTypes.CUSTOM_NAME);
                 }
             }
@@ -510,8 +601,7 @@ public class FastRename extends Module {
      * the two actually registers the change sends exactly one packet; the other sees it is
      * already set and does nothing.
      */
-    private void primeName(AnvilScreen screen, AnvilScreenHandler anvil) {
-        String want = itemName.get();
+    private void primeName(AnvilScreen screen, AnvilScreenHandler anvil, String want) {
 
         ((AnvilScreenAccessor) screen).getNameField().setText(want);
 
@@ -551,22 +641,29 @@ public class FastRename extends Module {
             // fill input 1
             for (int n = ANVIL_OFFSET; n < MAIN_INVENTORY_SIZE + ANVIL_OFFSET; n++) {
                 ItemStack stack = anvil.getSlot(n).getStack();
-                if ((blacklistMode.get() && !itemList.get().contains(stack.getItem()))
-                    || (!blacklistMode.get() && itemList.get().contains(stack.getItem())))
-                {
-                    if (stack.getName().getString().equals(itemName.get())) continue;
+                if (stack.isEmpty()) continue;
+                if (isTarget(stack.getItem())) {
+                    String want = nameFor(stack.getItem());
+                    if (stack.getName().getString().equals(want)) continue;
                     if (stack.contains(DataComponentTypes.CUSTOM_NAME) && !renameNamed.get()) continue;
-                    if (itemName.get().isBlank() && !stack.contains(DataComponentTypes.CUSTOM_NAME)) continue;
+                    if (want.isBlank() && !stack.contains(DataComponentTypes.CUSTOM_NAME)) continue;
 
+                    // The anvil holds one name at a time: give it this item's first, then the
+                    // item, so a list of different names goes through one after another.
+                    if (!want.equals(((AnvilScreenHandlerAccessor) anvil).getNewItemName())) {
+                        primeName(anvilScreen, anvil, want);
+                        return;
+                    }
                     InvUtils.shiftClick().slotId(n);
                     return;
                 }
             }
             // no more valid items
             finished();
-        } else if (!output.isEmpty() && itemList.get().contains(output.getItem())) {
+        } else if (!output.isEmpty() && isTarget(output.getItem())) {
             // take output
-            if (output.getName().getString().equals(itemName.get()) || (itemName.get().isBlank() && input1.contains(DataComponentTypes.CUSTOM_NAME))) {
+            String want = nameFor(output.getItem());
+            if (output.getName().getString().equals(want) || (want.isBlank() && input1.contains(DataComponentTypes.CUSTOM_NAME))) {
                 int cost = ((AnvilScreenHandlerAccessor) anvil).getLevelCost().get();
                 if (mc.player.experienceLevel >= cost) {
                     InvUtils.shiftClick().slotId(AnvilScreenHandler.OUTPUT_ID);
@@ -575,7 +672,7 @@ public class FastRename extends Module {
         } else if (!input2.isEmpty()) {
             // input 2 shouldn't be filled but correct it if so
             InvUtils.shiftClick().slotId(AnvilScreenHandler.INPUT_2_ID);
-            primeName(anvilScreen, anvil);
+            primeName(anvilScreen, anvil, nameFor(input1.getItem()));
         } else if (output.isEmpty()) {
             /*
              * See AnvilScreenMixin.java
@@ -583,10 +680,11 @@ public class FastRename extends Module {
              * as long as the AnvilScreen is prevented from sending additional rename packets when moving stacks.
              * Occasionally the output slot fails to update, so we refresh the slot manually here and just try again.
              **/
-            if (itemName.get().equals(((AnvilScreenHandlerAccessor) anvil).getNewItemName())) {
+            String want = nameFor(input1.getItem());
+            if (want.equals(((AnvilScreenHandlerAccessor) anvil).getNewItemName())) {
                 InvUtils.shiftClick().slotId(AnvilScreenHandler.INPUT_1_ID);
             } else {
-                primeName(anvilScreen, anvil);
+                primeName(anvilScreen, anvil, want);
             }
         }
     }
