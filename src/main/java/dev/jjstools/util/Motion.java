@@ -87,6 +87,24 @@ public final class Motion {
         return easeOut((now() - startMs - ms(delayMs)) / ms(ENTER_MS));
     }
 
+    /**
+     * The click GUI coming in when opened: as enter, but at the length set in JJ's theme
+     * (open-animation), the gaps between rows scaled with it.
+     */
+    public static double enterGui(double startMs, double delayMs) {
+        double length = dev.jjstools.gui.jjtheme.JJGuiTheme.openAnimationMs();
+        if (off() || length <= 0) return 1;
+        double scale = length / ENTER_MS;
+        return easeOut((now() - startMs - ms(delayMs * scale)) / ms(length));
+    }
+
+    /** Whether the click GUI opened at startMs has finished coming in, rows and all. */
+    public static boolean guiSettled(double startMs) {
+        double length = dev.jjstools.gui.jjtheme.JJGuiTheme.openAnimationMs();
+        if (off() || length <= 0) return true;
+        return now() - startMs > ms(1500 * length / ENTER_MS);
+    }
+
     /** How far in something still is, 1 to 0, that began leaving at startMs. */
     public static double exit(double startMs) {
         if (off()) return 0;

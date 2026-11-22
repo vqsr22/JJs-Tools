@@ -155,6 +155,24 @@ public class JJGuiTheme extends GuiTheme {
         .build()
     );
 
+    public final Setting<Integer> openAnimation = sgGeneral.add(new IntSetting.Builder()
+        .name("open-animation")
+        .description("How long the click GUI takes to come in when opened, in milliseconds: each row fading in a moment after the one before. 0 shows it at once.")
+        .defaultValue(200)
+        .range(0, 2000)
+        .sliderRange(0, 1000)
+        .build()
+    );
+
+    /** The open-animation time of JJ's theme, or the default when another theme is in use. */
+    public static double openAnimationMs() {
+        try {
+            if (meteordevelopment.meteorclient.gui.GuiThemes.get() instanceof JJGuiTheme t) return t.openAnimation.get();
+        } catch (Throwable ignored) {
+        }
+        return dev.jjstools.util.Motion.ENTER_MS;
+    }
+
     public final Setting<Boolean> followControlPanel = sgGeneral.add(new BoolSetting.Builder()
         .name("follow-control-panel")
         .description("Takes its colours from the theme picked in the Control Panel's settings, and changes with it. Turn off to set the colours by hand.")

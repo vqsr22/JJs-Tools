@@ -113,11 +113,11 @@ public class WJJModule extends WPressable implements JJWidget {
      */
     private double entrance() {
         double opened = dev.jjstools.util.Motion.openedAt(mc.currentScreen);
-        if (dev.jjstools.util.Motion.now() - opened > 1500) return 1;
+        if (dev.jjstools.util.Motion.guiSettled(opened)) return 1;
         int row = height > 0 ? (int) Math.round((y - WJJWindow.columnsTop(this)) / height) : 0;
         double delay = WJJWindow.columnIndex(this) * dev.jjstools.util.Motion.STAGGER_MS
             + Math.min(Math.max(row, 0), 24) * dev.jjstools.util.Motion.STAGGER_MS;
-        return dev.jjstools.util.Motion.enter(opened, delay);
+        return dev.jjstools.util.Motion.enterGui(opened, delay);
     }
 
     /** A colour with its see-through-ness scaled, for fading in. */

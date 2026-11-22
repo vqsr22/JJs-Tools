@@ -343,12 +343,12 @@ public class WJJWindow extends WWindow implements JJWidget {
         double rise = 0;
         if (column) {
             double opened = dev.jjstools.util.Motion.openedAt(net.minecraft.client.MinecraftClient.getInstance().currentScreen);
-            if (dev.jjstools.util.Motion.now() - opened < 1500) {
+            if (!dev.jjstools.util.Motion.guiSettled(opened)) {
                 // A window stacked under another comes in when the rows above it have, not with
                 // the top of its stack.
                 double unit = header != null && header.height > 0 ? header.height : theme.scale(20);
                 int down = (int) Math.round(Math.max(0, y - columnsTop(this)) / unit);
-                double in = dev.jjstools.util.Motion.enter(opened,
+                double in = dev.jjstools.util.Motion.enterGui(opened,
                     (columnIndex(this) + Math.min(down, 24)) * dev.jjstools.util.Motion.STAGGER_MS);
                 rise = Math.round((1 - in) * theme.scale(10));
             }
