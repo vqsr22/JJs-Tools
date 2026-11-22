@@ -23,10 +23,16 @@ public class NoPacketKicks extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgLimits = settings.createGroup("Limits");
 
-    private final Setting<Integer> headroom = sgGeneral.add(new IntSetting.Builder()
-        .name("headroom")
-        .description("Stop this many packets short of each limit, in case one gets counted that the server sees and this does not.")
-        .defaultValue(2).min(0).sliderRange(0, 10)
+    private final Setting<Integer> margin = sgGeneral.add(new IntSetting.Builder()
+        .name("safety-margin")
+        .description("Stop this many percent short of each limit (at least one packet). Packets reach the server bunched up by ping jitter and lag, so it can count more in its window than were sent in any one here.")
+        .defaultValue(10).range(0, 50).sliderRange(0, 30)
+        .build());
+
+    private final Setting<Boolean> tpsAware = sgGeneral.add(new BoolSetting.Builder()
+        .name("tps-aware")
+        .description("While the server lags, count over a longer window to match it (up to four times), since a lagging server counts over more real time.")
+        .defaultValue(true)
         .build());
 
     private final Setting<Boolean> blockInteract = sgGeneral.add(new BoolSetting.Builder()
@@ -88,8 +94,24 @@ public class NoPacketKicks extends Module {
         return m != null ? m.interactLimit.get() : PacketLimits.DEFAULT_INTERACT;
     }
 
+    /** Whether the windows follow the server's tick rate: on unless this module says otherwise. */
+    public static boolean tpsAware() {
+        NoPacketKicks m = Modules.get() == null ? null : Modules.get().get(NoPacketKicks.class);
+        return m == null || m.tpsAware.get();
+    }
+
+    /** Where to stop for a limit: the margin short of it, and always at least one short. */
+    private int stopAt(int limit) {
+        int under = Math.max(1, (int) Math.ceil(limit * margin.get() / 100.0));
+        return Math.max(1, limit - under);
+    }
+
     private boolean globalFull() {
-        return PacketLimits.global() >= globalLimit.get() - headroom.get();
+        return PacketLimits.global() >= stopAt(globalLimit.get());
+    }
+
+    private boolean inventoryFull() {
+        return PacketLimits.inventory() >= stopAt(inventoryLimit.get()) || globalFull();
     }
 
     /**
@@ -100,7 +122,7 @@ public class NoPacketKicks extends Module {
     public static boolean allowInventory() {
         NoPacketKicks m = active();
         if (m == null) return true;
-        boolean full = PacketLimits.inventory() >= m.inventoryLimit.get() - m.headroom.get() || m.globalFull();
+        boolean full = m.inventoryFull();
         if (full) m.tellOnce("Inventory packet limit reached: items cannot be moved for a moment.");
         return !full;
     }
@@ -108,7 +130,7 @@ public class NoPacketKicks extends Module {
     @EventHandler(priority = EventPriority.HIGHEST)
     private void onInteract(InteractBlockEvent event) {
         if (!blockInteract.get()) return;
-        if (PacketLimits.interact() >= interactLimit.get() - headroom.get() || globalFull()) {
+        if (PacketLimits.interact() >= stopAt(interactLimit.get()) || globalFull()) {
             event.cancel();
             tellOnce("Interaction packet limit reached: held back for a moment.");
         }
@@ -122,7 +144,7 @@ public class NoPacketKicks extends Module {
     private void onSend(PacketEvent.Send event) {
         if (event.isCancelled()) return;
         if (PacketLimits.isInventory(event.packet)) {
-            if (PacketLimits.inventory() >= inventoryLimit.get() - headroom.get() || globalFull()) {
+            if (inventoryFull()) {
                 event.cancel();
                 tellOnce("Inventory packet limit reached: a packet was held back.");
             }
