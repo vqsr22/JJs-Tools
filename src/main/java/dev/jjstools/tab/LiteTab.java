@@ -81,6 +81,10 @@ public final class LiteTab {
     private static Text[] names = new Text[0];
     private static Line[] nameLines = new Line[0];
     private static boolean[] spectator = new boolean[0];
+    /** Per name: 0 none, 1 a friend's box, 2 a monitored player's box. */
+    private static byte[] highlight = new byte[0];
+    /** Each name's drawn width, for the box round it. */
+    private static float[] nameWidth = new float[0];
     private static List<OrderedText> headerLines = List.of();
     private static List<OrderedText> footerLines = List.of();
     private static Line[] headerRuns = new Line[0];
@@ -269,6 +273,13 @@ public final class LiteTab {
             }
         }
 
+        // Friends and monitored players: a bevelled box round the name, under it.
+        for (int i = 0; i < n; i++) {
+            if (highlight[i] == 0) continue;
+            int argb = highlight[i] == 2 ? module.monitoredColour.get().getPacked() : module.friendBoxColour.get().getPacked();
+            bevel(ctx, listLeft + colX(i) + textOffset - 2, rowY(i, listTop) - 1, (int) Math.ceil(nameWidth[i]) + 3, ROW, argb);
+        }
+
         for (int i = 0; i < n; i++) {
             int x = listLeft + colX(i) + textOffset;
             int y = rowY(i, listTop);
@@ -302,6 +313,33 @@ public final class LiteTab {
      * A rounded rectangle through the GUI. The corners are quarter circles baked at the size
      * they come out on screen, so they stay smooth at any GUI and tab list scale.
      */
+    /**
+     * A box with a bevel: a see-through fill, lit along the top and left and shaded along the
+     * bottom and right, so it stands out of the list.
+     */
+    private static void bevel(DrawContext ctx, int x, int y, int w, int h, int argb) {
+        int a = (argb >>> 24) & 0xFF;
+        int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
+        int fill = fade(((a * 70 / 255) << 24) | (argb & 0xFFFFFF));
+        int light = fade((a << 24) | (mix(r, 255) << 16) | (mix(g, 255) << 8) | mix(b, 255));
+        int mid = fade((a << 24) | (argb & 0xFFFFFF));
+        int dark = fade((a << 24) | ((r * 45 / 100) << 16) | ((g * 45 / 100) << 8) | (b * 45 / 100));
+        ctx.fill(x + 1, y + 1, x + w - 1, y + h - 1, fill);
+        // Outer edge in the colour itself, then the bevel just inside it.
+        ctx.fill(x, y, x + w, y + 1, mid);
+        ctx.fill(x, y + h - 1, x + w, y + h, mid);
+        ctx.fill(x, y + 1, x + 1, y + h - 1, mid);
+        ctx.fill(x + w - 1, y + 1, x + w, y + h - 1, mid);
+        ctx.fill(x + 1, y + 1, x + w - 1, y + 2, light);
+        ctx.fill(x + 1, y + 2, x + 2, y + h - 1, light);
+        ctx.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, dark);
+        ctx.fill(x + w - 2, y + 2, x + w - 1, y + h - 2, dark);
+    }
+
+    private static int mix(int c, int to) {
+        return (c + to) / 2;
+    }
+
     private static void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb) {
         r = Math.min(r, Math.min(w, h) / 2);
         if (r < 1) {
@@ -423,6 +461,12 @@ public final class LiteTab {
         names = new Text[n];
         nameLines = new Line[n];
         spectator = new boolean[n];
+        highlight = new byte[n];
+        nameWidth = new float[n];
+        TabOptimizer opts = meteordevelopment.meteorclient.systems.modules.Modules.get().get(TabOptimizer.class);
+        boolean friendBox = opts != null && opts.friendBox.get();
+        java.util.Set<String> watched = new java.util.HashSet<>();
+        if (opts != null) for (String w : opts.monitored.get()) watched.add(w.trim().toLowerCase(java.util.Locale.ROOT));
 
         int maxName = 0;
         for (int i = 0; i < n; i++) {
@@ -432,7 +476,11 @@ public final class LiteTab {
             // Friends in Meteor's friend colour whether or not Better Tab is on; under JJ's theme
             // everyone else in the plain text colour, the server's own name colours left out.
             int colour = 0;
-            if (meteordevelopment.meteorclient.systems.friends.Friends.get().isFriend(e)) {
+            boolean friend = meteordevelopment.meteorclient.systems.friends.Friends.get().isFriend(e);
+            String profileName = dev.jjstools.compat.Compat.name(e.getProfile());
+            if (profileName != null && watched.contains(profileName.toLowerCase(java.util.Locale.ROOT))) highlight[i] = 2;
+            else if (friend && friendBox) highlight[i] = 1;
+            if (friend && !friendBox) {
                 colour = meteordevelopment.meteorclient.systems.config.Config.get().friendColor.get().getPacked();
             } else if (jj) {
                 colour = spectator[i] ? palette[5] : palette[4];
@@ -443,10 +491,11 @@ public final class LiteTab {
             }
             if (meteorText) {
                 nameLines[i] = runs(names[i], spectator[i] ? SPECTATOR : WHITE);
-                maxName = Math.max(maxName, (int) Math.ceil(nameLines[i].width));
+                nameWidth[i] = (float) nameLines[i].width;
             } else {
-                maxName = Math.max(maxName, tr.getWidth(names[i]));
+                nameWidth[i] = tr.getWidth(names[i]);
             }
+            maxName = Math.max(maxName, (int) Math.ceil(nameWidth[i]));
         }
 
         // Every column is wide enough for the longest name, so names never run into the next column.

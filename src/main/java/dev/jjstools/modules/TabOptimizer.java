@@ -38,6 +38,7 @@ public class TabOptimizer extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgLite = settings.createGroup("Lite Renderer");
     private final SettingGroup sgColours = settings.createGroup("Colours");
+    private final SettingGroup sgHighlights = settings.createGroup("Highlights");
     private final SettingGroup sgHeads = settings.createGroup("Heads");
     private final SettingGroup sgPerformance = settings.createGroup("Performance");
 
@@ -184,6 +185,36 @@ public class TabOptimizer extends Module {
         .description("Colour for the footer lines.")
         .defaultValue(new SettingColor(255, 255, 255))
         .visible(recolourFooter::get)
+        .build()
+    );
+
+    public final Setting<Boolean> friendBox = sgHighlights.add(new BoolSetting.Builder()
+        .name("friend-box")
+        .description("Show friends with a bevelled box round their name instead of in Meteor's friend colour. Lite renderer only.")
+        .defaultValue(true)
+        .onChanged(v -> LiteTab.invalidate())
+        .build()
+    );
+
+    public final Setting<SettingColor> friendBoxColour = sgHighlights.add(new ColorSetting.Builder()
+        .name("friend-box-colour")
+        .description("Colour of the box round friends' names.")
+        .defaultValue(new SettingColor(0, 255, 255))
+        .visible(friendBox::get)
+        .build()
+    );
+
+    public final Setting<java.util.List<String>> monitored = sgHighlights.add(new meteordevelopment.meteorclient.settings.StringListSetting.Builder()
+        .name("monitored-players")
+        .description("Names to pick out in the tab list with a box of their own colour. Not case sensitive. Lite renderer only.")
+        .onChanged(v -> LiteTab.invalidate())
+        .build()
+    );
+
+    public final Setting<SettingColor> monitoredColour = sgHighlights.add(new ColorSetting.Builder()
+        .name("monitored-colour")
+        .description("Colour of the box round monitored players' names.")
+        .defaultValue(new SettingColor(255, 80, 80))
         .build()
     );
 
