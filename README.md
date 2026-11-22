@@ -59,6 +59,7 @@ Credit to lambda and stardust for some modules
 | **Inventory Loadout** | Saves your inventory layout and restores it on a key |
 | **Kit Creator** | Copies a shulker box layout into another one |
 | **Light Levels** | Shows where mobs can spawn, with a per-mob filter |
+| **Lush Cave Map** | Highlights chunks with lush caves on Xaero's minimap and world map. Needs XaeroPlus |
 | **Module Wheel** | Hold a key and let go over a module to toggle it or a command to run it, each with its own name and icon. Right-click and drag to rearrange |
 | **No Packet Kicks** | Keeps your global, inventory and interaction packets under the server's limits; at the inventory limit items cannot be moved until it drops. Comes with a Packet Limits HUD element |
 | **No Jolt** | Stops the health and hunger icons shaking |

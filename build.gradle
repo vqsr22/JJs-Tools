@@ -25,12 +25,18 @@ base {
 
 apply from: 'gradle/versioned.gradle'
 
-// Compile-only stand-ins for classes of optional mods (Xaero's), so mixins can name them. They are
-// not packaged: the real classes come from the mods when they are installed.
+// Compile-only stand-ins for classes of optional mods (Xaero's, XaeroPlus), so mixins and bridges
+// can name them. They are not packaged: the real classes come from the mods when they are installed.
 sourceSets {
 	stubs {
 		java.srcDirs = ['src/stubs/java']
 	}
+}
+
+// Some stand-ins name Minecraft's own classes (XaeroPlus's map layers take a dimension key). Loom
+// makes these configurations later on, so they are picked up as they appear.
+configurations.matching { it.name == 'minecraftNamedCompile' || it.name == 'minecraftLibraries' }.all { c ->
+	configurations.stubsCompileOnly.extendsFrom(c)
 }
 
 repositories {
