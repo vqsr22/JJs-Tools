@@ -14,6 +14,7 @@ public class JJsHud {
         Hud.get().register(CustomShapeHud.INFO);
         Hud.get().register(PacketLimitsHud.INFO);
         dev.jjstools.util.ExordiumFixes.init();
+        dev.jjstools.util.DisconnectReason.init();
         dev.jjstools.util.PacketLimits.init();
     }
 }
