@@ -72,7 +72,7 @@ Credit to lambda and stardust for some modules
 | **Rubberband Notifier** | Reports lagbacks |
 | **Shulker Dyer** | Dyes shulker boxes and bundles in crafting grids |
 | **Sign to Item Frame** | Shows the item a sign names on the sign |
-| **Smoother Freecam** | Freecam that speeds up and glides to a stop like creative flight |
+| **Smoother Freecam** | Freecam that speeds up and glides to a stop like creative flight, moves every frame, flies up and down where you look (up to 45° by default) and floats out to the third-person spot when turned on |
 | **Storage GUI Tweaks** | Previews container contents at your crosshair and in tooltips, and tints shulker GUIs |
 | **Team Trees** | Plants saplings |
 | **Unobtrusive** | Moves or hides overlays and hand animations in the middle of the screen |

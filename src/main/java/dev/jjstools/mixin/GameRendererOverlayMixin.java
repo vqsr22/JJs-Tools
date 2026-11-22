@@ -8,9 +8,18 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/** Right after Minecraft draws the GUI, every frame: see ScreenOverlay. Before Meteor draws its own screens there. */
+/**
+ * Right after Minecraft draws the GUI, every frame: see ScreenOverlay. Before Meteor draws its own screens there.
+ * Also the start of every frame, for Smoother Freecam.
+ */
 @Mixin(value = GameRenderer.class, priority = 900)
 public abstract class GameRendererOverlayMixin {
+    /** Before anything is drawn, so the camera is placed from where Smoother Freecam has it this frame. */
+    @Inject(method = "render", at = @At("HEAD"), require = 0)
+    private void jjsTools$frameStart(RenderTickCounter tickCounter, boolean tick, CallbackInfo ci) {
+        dev.jjstools.modules.SmootherFreecam.frame();
+    }
+
     //#if MC >= 1.21.6
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/gui/render/GuiRenderer;render(Lcom/mojang/blaze3d/buffers/GpuBufferSlice;)V", shift = At.Shift.AFTER), require = 0)
     //#else
