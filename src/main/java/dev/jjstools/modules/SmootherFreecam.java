@@ -23,6 +23,12 @@ import meteordevelopment.orbit.EventPriority;
 public class SmootherFreecam extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
 
+    private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
+        .name("speed")
+        .description("Top speed, as a multiple of Freecam's own speed. 1 is Freecam's speed; 2 is twice as fast.")
+        .defaultValue(1).min(0.05).max(20).sliderRange(0.1, 5)
+        .build());
+
     private final Setting<Double> acceleration = sgGeneral.add(new DoubleSetting.Builder()
         .name("acceleration")
         .description("How quickly the camera gets up to speed while a key is held: the share of the way to full speed it closes each tick. Lower is floatier.")
@@ -70,9 +76,10 @@ public class SmootherFreecam extends Module {
             vx = vy = vz = 0;
             return;
         }
-        double wantX = freecam.pos.x - freecam.prevPos.x;
-        double wantY = freecam.pos.y - freecam.prevPos.y;
-        double wantZ = freecam.pos.z - freecam.prevPos.z;
+        double mul = speed.get();
+        double wantX = (freecam.pos.x - freecam.prevPos.x) * mul;
+        double wantY = (freecam.pos.y - freecam.prevPos.y) * mul;
+        double wantZ = (freecam.pos.z - freecam.prevPos.z) * mul;
         boolean held = wantX * wantX + wantY * wantY + wantZ * wantZ > 1e-10;
 
         if (held) {
