@@ -553,9 +553,11 @@ public final class StorageMemory {
      * chests were remembered is read the same way, every record in it being a shulker box.
      */
     private static boolean ensureLoaded() {
-        if (loaded) return true;
-
         MinecraftClient mc = MinecraftClient.getInstance();
+        if (loaded) {
+            if (mc != null && mc.world != null) syncRegistries(mc);
+            return true;
+        }
         if (mc == null || mc.world == null) return false;
 
         loaded = true;
@@ -569,62 +571,16 @@ public final class StorageMemory {
             fromOld = true;
         }
 
-        RegistryOps<JsonElement> ops = mc.world.getRegistryManager().getOps(JsonOps.INSTANCE);
-        RegistryOps<NbtElement> nbtOps = mc.world.getRegistryManager().getOps(NbtOps.INSTANCE);
-
         try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
-
             for (Map.Entry<String, JsonElement> entry : root.entrySet()) {
-                try {
-                    JsonObject box = entry.getValue().getAsJsonObject();
-                    String name = box.has("name") ? box.get("name").getAsString() : null;
-
-                    Kind kind = Kind.Shulker;
-                    if (box.has("kind")) {
-                        try {
-                            kind = Kind.valueOf(box.get("kind").getAsString());
-                        } catch (IllegalArgumentException ignored) {
-                            continue;
-                        }
-                    }
-
-                    JsonArray array = box.getAsJsonArray("items");
-                    int size = array != null && array.size() > SIZE ? SIZE * 2 : SIZE;
-
-                    List<ItemStack> items = new ArrayList<>(size);
-                    for (int i = 0; i < size; i++) {
-                        ItemStack stack = ItemStack.EMPTY;
-                        if (array != null && i < array.size()) {
-                            stack = readStack(array.get(i), ops, nbtOps);
-                        }
-                        items.add(stack);
-                    }
-
-                    BOXES.put(entry.getKey(), new Box(name, items, kind));
-
-                    // Already in the current format: kept exactly as read, so the first save
-                    // after loading has nothing to convert.
-                    // Items still written the old way, as JSON, are left out so they are
-                    // converted to the item format the next time anything is saved.
-                    boolean current = !fromOld;
-                    if (current && array != null) {
-                        for (JsonElement item : array) {
-                            if (item.isJsonObject()) {
-                                current = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (current) ENCODED.put(entry.getKey(), box);
-                    else dirty = true;
-                } catch (Exception ignored) {
-                    // One unreadable record is not worth losing the rest over.
-                }
+                if (entry.getValue().isJsonObject()) ENCODED.put(entry.getKey(), entry.getValue().getAsJsonObject());
             }
         } catch (Exception e) {
             System.err.println("[JJs Tools] Could not read " + path.getFileName() + ": " + e);
         }
+        if (fromOld) legacy = true;
+        syncRegistries(mc);
 
         // Written straight out under the new name, so the old file is only ever read the once.
         if (fromOld) {
@@ -634,6 +590,80 @@ public final class StorageMemory {
 
         return true;
     }
+
+    /**
+     * The item registries the remembered items were read with. Every server (and the queue in
+     * front of one) sends its own, and an item only reads in the registries it was written
+     * under: armour trims, for one, are missing from a queue's. So the saved form of each record
+     * is kept, and the records are read again whenever the registries change. Anything changed
+     * under the old ones is written out with them first, so nothing is lost in between.
+     */
+    private static net.minecraft.registry.DynamicRegistryManager decodedWith;
+    /** Set when the file held records in an older format, which are rewritten once read. */
+    private static boolean legacy;
+
+    private static void syncRegistries(MinecraftClient mc) {
+        net.minecraft.registry.DynamicRegistryManager now = mc.world.getRegistryManager();
+        if (now == decodedWith) return;
+
+        if (decodedWith != null) {
+            RegistryOps<NbtElement> oldOps = decodedWith.getOps(NbtOps.INSTANCE);
+            for (Map.Entry<String, Box> entry : BOXES.entrySet()) {
+                if (!ENCODED.containsKey(entry.getKey())) ENCODED.put(entry.getKey(), encode(entry.getValue(), oldOps));
+            }
+        }
+        decodedWith = now;
+        lastNbtOps = now.getOps(NbtOps.INSTANCE);
+
+        RegistryOps<JsonElement> ops = now.getOps(JsonOps.INSTANCE);
+        RegistryOps<NbtElement> nbtOps = lastNbtOps;
+        BOXES.clear();
+        unreadable = 0;
+        java.util.List<String> rewrite = new ArrayList<>();
+        for (Map.Entry<String, JsonObject> entry : ENCODED.entrySet()) {
+            try {
+                JsonObject box = entry.getValue();
+                String name = box.has("name") ? box.get("name").getAsString() : null;
+                Kind kind = Kind.Shulker;
+                if (box.has("kind")) {
+                    try {
+                        kind = Kind.valueOf(box.get("kind").getAsString());
+                    } catch (IllegalArgumentException ignored) {
+                        continue;
+                    }
+                }
+                JsonArray array = box.getAsJsonArray("items");
+                int size = array != null && array.size() > SIZE ? SIZE * 2 : SIZE;
+                boolean old = legacy;
+                int unreadableBefore = unreadable;
+                List<ItemStack> items = new ArrayList<>(size);
+                for (int i = 0; i < size; i++) {
+                    ItemStack stack = ItemStack.EMPTY;
+                    if (array != null && i < array.size()) {
+                        if (array.get(i).isJsonObject()) old = true;
+                        stack = readStack(array.get(i), ops, nbtOps);
+                    }
+                    items.add(stack);
+                }
+                BOXES.put(entry.getKey(), new Box(name, items, kind));
+                // Items still written the old way, as JSON, are written again in the item
+                // format the next time anything is saved.
+                // Only once every item in it was read, so none is written out as nothing.
+                if (old && unreadable == unreadableBefore) rewrite.add(entry.getKey());
+            } catch (Exception ignored) {
+                // One unreadable record is not worth losing the rest over.
+            }
+        }
+        for (String key : rewrite) ENCODED.remove(key);
+        if (!rewrite.isEmpty()) dirty = true;
+        legacy = false;
+        if (unreadable > 0) {
+            dev.jjstools.JJsTools.LOG.info("Storage previews: " + unreadable + " remembered items cannot be shown on this server (its game data lacks them); they are kept and come back where they can be read");
+        }
+    }
+
+    /** Items that could not be read in the registries last read with. */
+    private static int unreadable;
 
     // Items
 
@@ -730,7 +760,7 @@ public final class StorageMemory {
             var result = ItemStack.CODEC.parse(nbtOps, element);
             ItemStack stack = result.result().orElse(null);
             if (stack == null) {
-                report("read", null, result.error().map(Object::toString).orElse("unknown"));
+                unreadable++;
                 return ItemStack.EMPTY;
             }
             return stack;
@@ -742,8 +772,9 @@ public final class StorageMemory {
 
     private static void report(String what, @Nullable ItemStack stack, String why) {
         String item = stack == null ? "an item" : stack.getItem().toString();
-        if (REPORTED.add(what + item + why)) {
-            dev.jjstools.JJsTools.LOG.warn("Storage previews could not " + what + " " + item + ": " + why);
+        String shortWhy = why.length() > 300 ? why.substring(0, 300) + "..." : why;
+        if (REPORTED.size() < 20 && REPORTED.add(what + item + shortWhy)) {
+            dev.jjstools.JJsTools.LOG.warn("Storage previews could not " + what + " " + item + ": " + shortWhy);
         }
     }
 
@@ -764,7 +795,7 @@ public final class StorageMemory {
         // The world's item registries, or the last ones seen: leaving a world can clear the
         // world before this is called, and saving nothing then lost whatever had changed since
         // the last save.
-        if (mc.world != null) lastNbtOps = mc.world.getRegistryManager().getOps(NbtOps.INSTANCE);
+        if (mc.world != null) syncRegistries(mc);
         RegistryOps<NbtElement> nbtOps = lastNbtOps;
         if (nbtOps == null) return;
         JsonObject root = new JsonObject();
