@@ -189,32 +189,32 @@ public class TabOptimizer extends Module {
     );
 
     public final Setting<Boolean> friendBox = sgHighlights.add(new BoolSetting.Builder()
-        .name("friend-box")
-        .description("Show friends with a bevelled box round their name instead of in Meteor's friend colour. Lite renderer only.")
+        .name("friend-highlight")
+        .description("Show friends with a soft rounded highlight behind their name instead of in Meteor's friend colour. Lite renderer only.")
         .defaultValue(true)
         .onChanged(v -> LiteTab.invalidate())
         .build()
     );
 
     public final Setting<SettingColor> friendBoxColour = sgHighlights.add(new ColorSetting.Builder()
-        .name("friend-box-colour")
-        .description("Colour of the box round friends' names.")
-        .defaultValue(new SettingColor(0, 255, 255))
+        .name("friend-highlight-colour")
+        .description("Colour of the highlight behind friends' names.")
+        .defaultValue(new SettingColor(110, 200, 225))
         .visible(friendBox::get)
         .build()
     );
 
     public final Setting<java.util.List<String>> monitored = sgHighlights.add(new meteordevelopment.meteorclient.settings.StringListSetting.Builder()
         .name("monitored-players")
-        .description("Names to pick out in the tab list with a box of their own colour. Not case sensitive. Lite renderer only.")
+        .description("Names to pick out in the tab list with a highlight of their own colour. Not case sensitive. Lite renderer only.")
         .onChanged(v -> LiteTab.invalidate())
         .build()
     );
 
     public final Setting<SettingColor> monitoredColour = sgHighlights.add(new ColorSetting.Builder()
-        .name("monitored-colour")
-        .description("Colour of the box round monitored players' names.")
-        .defaultValue(new SettingColor(255, 80, 80))
+        .name("monitored-highlight-colour")
+        .description("Colour of the highlight behind monitored players' names.")
+        .defaultValue(new SettingColor(235, 110, 110))
         .build()
     );
 

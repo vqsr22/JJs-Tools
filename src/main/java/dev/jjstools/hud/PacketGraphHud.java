@@ -253,13 +253,13 @@ public class PacketGraphHud extends HudElement {
         double p = panel.get() ? pad() : 0;
         double r = radius.get();
 
-        if (panel.get()) round(renderer, x, y, getWidth(), getHeight(), r, c[0]);
+        if (panel.get()) SoftShapes.roundRect(x, y, getWidth(), getHeight(), r, c[0]);
 
         double header = headerHeight(renderer);
         if (header > 0) drawHeader(renderer, x + p, y + p, getWidth() - p * 2, c);
 
         double gx = x + p, gy = y + p + header, gw = getWidth() - p * 2, gh = graphHeight.get();
-        round(renderer, gx, gy, gw, gh, Math.max(0, r - (panel.get() ? 1 : 0)), c[1]);
+        SoftShapes.roundRect(gx, gy, gw, gh, Math.max(0, r - (panel.get() ? 1 : 0)), c[1]);
 
         // Inside the well, kept clear of its rounded corners.
         double inset = Math.max(1, Math.min(r * 0.5, 3));
@@ -308,7 +308,7 @@ public class PacketGraphHud extends HudElement {
             double wl = renderer.textWidth(limit, sh, scale), wc = renderer.textWidth(count, sh, scale);
             double start = rx - wl - wc - dot - 3;
             if (start < lx) break;
-            round(renderer, start, hy + (th - dot) / 2 - 0.5, dot, dot, dot / 2, c[5 + i]);
+            SoftShapes.circle(start + dot / 2, hy + th / 2 - 0.5, dot / 2, c[5 + i]);
             renderer.text(count, start + dot + 3, hy, figure, sh, scale);
             renderer.text(limit, start + dot + 3 + wc, hy, c[4], sh, scale);
             rx = start - 7;
@@ -317,85 +317,39 @@ public class PacketGraphHud extends HudElement {
 
     private void drawSeries(HudRenderer renderer, double[] series, int shown, double perStep, double into,
                             double px, double py, double pw, double ph, Color colour) {
-        double thick = thickness.get();
-        int fillA = fillOpacity.get();
-        Color fillTop = alpha(colour, fillA), fillBottom = alpha(colour, 0);
-
+        double[] xs = new double[shown + 2], ys = new double[shown + 2];
+        int n = 0;
         double prevX = 0, prevY = 0;
-        boolean first = true;
         for (int k = 0; k < shown; k++) {
             int idx = Math.floorMod(head - (shown - 1 - k), MAX_SAMPLES);
             double sx = px + (k - into) * perStep;
             double v = Math.max(0, Math.min(1, series[idx]));
             double sy = py + ph - v * ph;
-            if (!first) {
-                // Clipped to the graph's sides.
-                double x1 = Math.max(px, prevX), x2 = Math.min(px + pw, sx);
-                if (x2 > x1) {
-                    double t1 = (x1 - prevX) / (sx - prevX), t2 = (x2 - prevX) / (sx - prevX);
-                    double y1 = prevY + (sy - prevY) * t1, y2 = prevY + (sy - prevY) * t2;
-                    if (fillA > 0) {
-                        // The area under the segment: a slope on top, straight down to the bottom.
-                        double bottom = py + ph;
-                        double low = Math.max(y1, y2);
-                        renderer.triangle(x1, y1, x2, y2, y1 > y2 ? x1 : x2, low, fillTop);
-                        renderer.quad(x1, low, x2 - x1, bottom - low, fillTop, fillTop, fillBottom, fillBottom);
-                    }
-                    thickLine(renderer, x1, y1, x2, y2, thick, colour);
+            if (k > 0) {
+                // Clipped to the graph's sides: a point where the line crosses each edge.
+                if (prevX < px && sx >= px) {
+                    xs[n] = px;
+                    ys[n++] = prevY + (sy - prevY) * (px - prevX) / (sx - prevX);
                 }
+                if (sx >= px && sx <= px + pw) {
+                    xs[n] = sx;
+                    ys[n++] = sy;
+                } else if (prevX <= px + pw && sx > px + pw) {
+                    xs[n] = px + pw;
+                    ys[n++] = prevY + (sy - prevY) * (px + pw - prevX) / (sx - prevX);
+                }
+            } else if (sx >= px && sx <= px + pw) {
+                xs[n] = sx;
+                ys[n++] = sy;
             }
             prevX = sx;
             prevY = sy;
-            first = false;
         }
+        if (n < 2) return;
+
+        int fillA = fillOpacity.get();
+        if (fillA > 0) SoftShapes.areaUnder(xs, ys, n, py + ph, alpha(colour, fillA), alpha(colour, 0));
+        SoftShapes.polyline(xs, ys, n, thickness.get(), colour);
     }
 
-    // Shapes
-
-    /** A line of any thickness, as two triangles, with a round joint so segments meet cleanly. */
-    private static void thickLine(HudRenderer renderer, double x1, double y1, double x2, double y2, double t, Color c) {
-        if (t <= 1.01) {
-            renderer.line(x1, y1, x2, y2, c);
-            return;
-        }
-        double dx = x2 - x1, dy = y2 - y1;
-        double len = Math.sqrt(dx * dx + dy * dy);
-        if (len < 1e-6) return;
-        double nx = -dy / len * t / 2, ny = dx / len * t / 2;
-        renderer.triangle(x1 + nx, y1 + ny, x2 + nx, y2 + ny, x2 - nx, y2 - ny, c);
-        renderer.triangle(x1 + nx, y1 + ny, x2 - nx, y2 - ny, x1 - nx, y1 - ny, c);
-        disc(renderer, x2, y2, t / 2, c);
-    }
-
-    private static void disc(HudRenderer renderer, double cx, double cy, double r, Color c) {
-        int n = 8;
-        for (int i = 0; i < n; i++) {
-            double a1 = Math.PI * 2 * i / n, a2 = Math.PI * 2 * (i + 1) / n;
-            renderer.triangle(cx, cy, cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, cx + Math.cos(a2) * r, cy + Math.sin(a2) * r, c);
-        }
-    }
-
-    /** A rounded rectangle, as the panel's. */
-    private static void round(HudRenderer renderer, double x, double y, double w, double h, double r, Color c) {
-        r = Math.min(r, Math.min(w, h) / 2);
-        if (r < 0.5) {
-            renderer.quad(x, y, w, h, c);
-            return;
-        }
-        renderer.quad(x + r, y, w - r * 2, h, c);
-        renderer.quad(x, y + r, r, h - r * 2, c);
-        renderer.quad(x + w - r, y + r, r, h - r * 2, c);
-        corner(renderer, x + r, y + r, r, Math.PI, c);
-        corner(renderer, x + w - r, y + r, r, Math.PI * 1.5, c);
-        corner(renderer, x + w - r, y + h - r, r, 0, c);
-        corner(renderer, x + r, y + h - r, r, Math.PI * 0.5, c);
-    }
-
-    private static void corner(HudRenderer renderer, double cx, double cy, double r, double start, Color c) {
-        int n = Math.max(3, (int) Math.ceil(r * 1.5));
-        for (int i = 0; i < n; i++) {
-            double a1 = start + Math.PI / 2 * i / n, a2 = start + Math.PI / 2 * (i + 1) / n;
-            renderer.triangle(cx, cy, cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, cx + Math.cos(a2) * r, cy + Math.sin(a2) * r, c);
-        }
-    }
 }

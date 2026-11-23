@@ -273,11 +273,11 @@ public final class LiteTab {
             }
         }
 
-        // Friends and monitored players: a bevelled box round the name, under it.
+        // Friends and monitored players: a soft highlight behind the name.
         for (int i = 0; i < n; i++) {
             if (highlight[i] == 0) continue;
             int argb = highlight[i] == 2 ? module.monitoredColour.get().getPacked() : module.friendBoxColour.get().getPacked();
-            bevel(ctx, listLeft + colX(i) + textOffset - 2, rowY(i, listTop) - 1, (int) Math.ceil(nameWidth[i]) + 3, ROW, argb);
+            pill(ctx, listLeft + colX(i) + textOffset - 3, rowY(i, listTop) - 1, (int) Math.ceil(nameWidth[i]) + 5, ROW, argb);
         }
 
         for (int i = 0; i < n; i++) {
@@ -314,30 +314,14 @@ public final class LiteTab {
      * they come out on screen, so they stay smooth at any GUI and tab list scale.
      */
     /**
-     * A box with a bevel: a see-through fill, lit along the top and left and shaded along the
-     * bottom and right, so it stands out of the list.
+     * A soft highlight behind a name: a faint rounded tint with a slim rounded bar in the full
+     * colour at its left, both with the panel's smooth corners.
      */
-    private static void bevel(DrawContext ctx, int x, int y, int w, int h, int argb) {
+    private static void pill(DrawContext ctx, int x, int y, int w, int h, int argb) {
         int a = (argb >>> 24) & 0xFF;
-        int r = (argb >> 16) & 0xFF, g = (argb >> 8) & 0xFF, b = argb & 0xFF;
-        int fill = fade(((a * 70 / 255) << 24) | (argb & 0xFFFFFF));
-        int light = fade((a << 24) | (mix(r, 255) << 16) | (mix(g, 255) << 8) | mix(b, 255));
-        int mid = fade((a << 24) | (argb & 0xFFFFFF));
-        int dark = fade((a << 24) | ((r * 45 / 100) << 16) | ((g * 45 / 100) << 8) | (b * 45 / 100));
-        ctx.fill(x + 1, y + 1, x + w - 1, y + h - 1, fill);
-        // Outer edge in the colour itself, then the bevel just inside it.
-        ctx.fill(x, y, x + w, y + 1, mid);
-        ctx.fill(x, y + h - 1, x + w, y + h, mid);
-        ctx.fill(x, y + 1, x + 1, y + h - 1, mid);
-        ctx.fill(x + w - 1, y + 1, x + w, y + h - 1, mid);
-        ctx.fill(x + 1, y + 1, x + w - 1, y + 2, light);
-        ctx.fill(x + 1, y + 2, x + 2, y + h - 1, light);
-        ctx.fill(x + 1, y + h - 2, x + w - 1, y + h - 1, dark);
-        ctx.fill(x + w - 2, y + 2, x + w - 1, y + h - 2, dark);
-    }
-
-    private static int mix(int c, int to) {
-        return (c + to) / 2;
+        int rgb = argb & 0xFFFFFF;
+        round(ctx, x, y, w, h, Math.min(3, h / 2), fade(((a * 50 / 255) << 24) | rgb));
+        round(ctx, x, y + 1, 2, h - 2, 1, fade(((a * 230 / 255) << 24) | rgb));
     }
 
     private static void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb) {
