@@ -9,7 +9,8 @@ import java.util.Set;
 
 /**
  * The Xaero settings Incognito turns off while it is on: World Map's cursor coordinates and its
- * waypoints, and the Minimap's waypoints. Matched by the option objects themselves, looked up once
+ * waypoints, and the Minimap's waypoints, on the
+ * minimap and drawn in the world. Matched by the option objects themselves, looked up once
  * by reflection, since the two mods could share an option name.
  */
 public final class XaeroIncognito {
@@ -31,6 +32,8 @@ public final class XaeroIncognito {
         add(found, "xaero.map.common.config.option.WorldMapProfiledConfigOptions", "COORDINATES");
         add(found, "xaero.map.common.config.option.WorldMapProfiledConfigOptions", "WAYPOINTS");
         add(found, "xaero.hud.minimap.common.config.option.MinimapProfiledConfigOptions", "WAYPOINTS_ON_MINIMAP");
+        // The beacons and labels drawn in the world itself.
+        add(found, "xaero.hud.minimap.common.config.option.MinimapProfiledConfigOptions", "WAYPOINTS_IN_WORLD");
         return found;
     }
 

@@ -77,7 +77,7 @@ public class Incognito extends Module {
 
     private final Setting<Boolean> hideXaero = sgXaero.add(new BoolSetting.Builder()
         .name("hide-xaero-info")
-        .description("While this is on, turns off Xaero's World Map cursor coordinates and the waypoints on Xaero's minimap and world map. Xaero's own settings are not changed, so they come back when this is turned off.")
+        .description("While this is on, turns off Xaero's World Map cursor coordinates and Xaero's waypoints: on the minimap, the world map, and drawn in the world. Xaero's own settings are not changed, so they come back when this is turned off.")
         .defaultValue(true)
         .build());
 
