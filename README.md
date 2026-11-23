@@ -61,7 +61,6 @@ Credit to lambda and stardust for some modules
 | **Light Levels** | Shows where mobs can spawn, with a per-mob filter |
 | **Lush Cave Map** | Highlights chunks with lush caves on Xaero's minimap and world map, remembered per server. Needs XaeroPlus |
 | **Module Wheel** | Hold a key and let go over a module to toggle it or a command to run it, each with its own name and icon. Right-click and drag to rearrange |
-| **No Packet Kicks** | Keeps your global, inventory and interaction packets under the server's limits; at the inventory limit items cannot be moved until it drops. Comes with a Packet Limits HUD element |
 | **No Jolt** | Stops the health and hunger icons shaking |
 | **Optimise Tablist** | Makes the tab list cheap to draw, with an optional JJ's theme look |
 | **Pickup Loot Stream** | Shows what you pick up in a corner of the screen |
@@ -91,7 +90,7 @@ Credit to lambda and stardust for some modules
 
 ## HUD elements
 
-**Custom Text**, **Custom Shape** (rectangle, ellipse, triangle or line) and **Packet Limits** (global, inventory and interaction packets against the server's limits).
+**Custom Text**, **Custom Shape** (rectangle, ellipse, triangle or line), **Packet Limits** (global, inventory and interaction packets against the server's limits) and **Packet Graph** (a smooth live graph of the same). The limits are set in the HUD tab's Packet Limits group.
 
 The HUD tab also has an **exordium-fixes** switch, off by default: with Exordium installed it stops Meteor's HUD, other add-ons' HUD text, the crosshair preview, Incognito's covers and the tab list from flickering.
 

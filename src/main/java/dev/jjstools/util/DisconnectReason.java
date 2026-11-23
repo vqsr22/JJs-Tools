@@ -131,7 +131,7 @@ public final class DisconnectReason {
         for (String g : GAME) if (name.startsWith(g)) return null;
         if (name.startsWith("meteordevelopment.orbit.") || name.startsWith("meteordevelopment.meteorclient.mixin.")
             || name.startsWith("meteordevelopment.meteorclient.utils.") || name.startsWith("meteordevelopment.meteorclient.events.")
-            || name.startsWith("dev.jjstools.util.PacketLimits") || name.startsWith("dev.jjstools.modules.NoPacketKicks")) return null;
+            || name.startsWith("dev.jjstools.util.PacketLimits")) return null;
         String mod = CLASS_MOD.computeIfAbsent(cls, DisconnectReason::jarMod);
         return mod.isEmpty() ? null : mod;
     }

@@ -1,6 +1,5 @@
 package dev.jjstools.hud;
 
-import dev.jjstools.modules.NoPacketKicks;
 import dev.jjstools.util.PacketLimits;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.hud.HudElement;
@@ -41,16 +40,16 @@ public class PacketLimitsHud extends HudElement {
 
     private String[] lines() {
         return new String[] {
-            "global: " + PacketLimits.global() + "/" + NoPacketKicks.globalLimitShown(),
-            "inv: " + PacketLimits.inventory() + "/" + NoPacketKicks.inventoryLimitShown(),
-            "int: " + PacketLimits.interact() + "/" + NoPacketKicks.interactLimitShown() };
+            "global: " + PacketLimits.global() + "/" + PacketLimits.globalLimit(),
+            "inv: " + PacketLimits.inventory() + "/" + PacketLimits.inventoryLimit(),
+            "int: " + PacketLimits.interact() + "/" + PacketLimits.interactLimit() };
     }
 
     private double[] fills() {
         return new double[] {
-            PacketLimits.global() / (double) NoPacketKicks.globalLimitShown(),
-            PacketLimits.inventory() / (double) NoPacketKicks.inventoryLimitShown(),
-            PacketLimits.interact() / (double) NoPacketKicks.interactLimitShown() };
+            PacketLimits.global() / (double) PacketLimits.globalLimit(),
+            PacketLimits.inventory() / (double) PacketLimits.inventoryLimit(),
+            PacketLimits.interact() / (double) PacketLimits.interactLimit() };
     }
 
     @Override

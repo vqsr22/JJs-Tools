@@ -13,6 +13,7 @@ public class JJsHud {
         Hud.get().register(CustomTextHud.INFO);
         Hud.get().register(CustomShapeHud.INFO);
         Hud.get().register(PacketLimitsHud.INFO);
+        Hud.get().register(PacketGraphHud.INFO);
         dev.jjstools.util.ExordiumFixes.init();
         dev.jjstools.util.DisconnectReason.init();
         dev.jjstools.util.PacketLimits.init();

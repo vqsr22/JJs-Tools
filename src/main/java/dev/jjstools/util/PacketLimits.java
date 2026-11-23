@@ -16,11 +16,11 @@ import java.util.ArrayDeque;
  * Counts the packets you send, the way the server's packet limits count them: every packet over
  * the last four seconds, inventory packets (slot clicks, creative inventory actions and container
  * buttons) over the last four seconds, and block interactions over the last 310 milliseconds.
- * Always counting, so the HUD shows the numbers whether or not No Packet Kicks is on.
+ * Always counting, for the Packet Limits and Packet Graph HUD elements.
  *
  * With the server lagging, its windows may cover more real time than these (if it measures them
- * in ticks), so it can count packets that have already dropped out here. When No Packet Kicks
- * says to, the windows are stretched by how far the server is behind 20 ticks a second.
+ * in ticks), so it can count packets that have already dropped out here. When tps-aware is on,
+ * the windows are stretched by how far the server is behind 20 ticks a second.
  */
 public final class PacketLimits {
     private PacketLimits() {}
@@ -37,8 +37,40 @@ public final class PacketLimits {
     private static final ArrayDeque<Long> inventory = new ArrayDeque<>();
     private static final ArrayDeque<Long> interact = new ArrayDeque<>();
 
+    private static meteordevelopment.meteorclient.settings.Setting<Integer> globalLimit, inventoryLimit, interactLimit;
+    private static meteordevelopment.meteorclient.settings.Setting<Boolean> tpsAware;
+
+    /**
+     * The limits, kept with Meteor's HUD settings (the HUD tab, "Packet Limits") so the Packet
+     * Limits and Packet Graph elements share them.
+     */
     public static void init() {
+        var group = meteordevelopment.meteorclient.systems.hud.Hud.get().settings.createGroup("Packet Limits");
+        globalLimit = group.add(new meteordevelopment.meteorclient.settings.IntSetting.Builder()
+            .name("global-limit").description("Packets of any kind the server allows in four seconds.")
+            .defaultValue(DEFAULT_GLOBAL).min(1).sliderRange(100, 2000).build());
+        inventoryLimit = group.add(new meteordevelopment.meteorclient.settings.IntSetting.Builder()
+            .name("inventory-limit").description("Inventory packets (slot clicks, creative inventory, container buttons) the server allows in four seconds.")
+            .defaultValue(DEFAULT_INVENTORY).min(1).sliderRange(10, 200).build());
+        interactLimit = group.add(new meteordevelopment.meteorclient.settings.IntSetting.Builder()
+            .name("interact-limit").description("Block interactions the server allows in 310 milliseconds.")
+            .defaultValue(DEFAULT_INTERACT).min(1).sliderRange(1, 30).build());
+        tpsAware = group.add(new meteordevelopment.meteorclient.settings.BoolSetting.Builder()
+            .name("tps-aware").description("While the server lags, count over a longer window to match it (up to four times), since a lagging server counts over more real time.")
+            .defaultValue(true).build());
         meteordevelopment.meteorclient.MeteorClient.EVENT_BUS.subscribe(PacketLimits.class);
+    }
+
+    public static int globalLimit() {
+        return globalLimit != null ? globalLimit.get() : DEFAULT_GLOBAL;
+    }
+
+    public static int inventoryLimit() {
+        return inventoryLimit != null ? inventoryLimit.get() : DEFAULT_INVENTORY;
+    }
+
+    public static int interactLimit() {
+        return interactLimit != null ? interactLimit.get() : DEFAULT_INTERACT;
     }
 
     public static boolean isInventory(Packet<?> packet) {
@@ -78,7 +110,7 @@ public final class PacketLimits {
 
     /** How much the windows are stretched right now: 1, or more while the server lags. */
     public static double stretch() {
-        if (!dev.jjstools.modules.NoPacketKicks.tpsAware()) return 1;
+        if (tpsAware != null && !tpsAware.get()) return 1;
         float tps = meteordevelopment.meteorclient.utils.world.TickRate.INSTANCE.getTickRate();
         if (!(tps > 0) || tps >= 19.5f) return 1;
         return Math.min(MAX_STRETCH, 20.0 / tps);

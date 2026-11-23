@@ -46,7 +46,6 @@
 		"MinecraftClientBorderlessMixin",
 		"ModulesAddMixin",
 		"ModulesScreenMixin",
-		"PacketLimitClickMixin",
 		"ParticleManagerMixin",
 		"PeekScreenMixin",
 		"PlayerListHudAccessor",
