@@ -43,6 +43,7 @@ Credit to lambda and stardust for some modules
 | **Auto Turtle Helmet** | Puts on a turtle helmet from your inventory |
 | **Auto Wear Gold** | Wears a gold piece while piglins are near |
 | **Bed Marker** | Marks your last spawn bed |
+| **Better Auto Eat** | Eats at set health and hunger (Mio style), with stop-on-attack, a highest-priority mode that holds everything else back while eating, and taking food from your inventory |
 | **Better Hitreg** | Makes hits feel instant. Ported from [Better Hitreg][betterhitreg] |
 | **Chat Notifications** | Plays a sound on whispers and mentions |
 | **Chat Tweaks** | Cleans up green text, prefixes and client junk in chat |
@@ -71,7 +72,7 @@ Credit to lambda and stardust for some modules
 | **Rubberband Notifier** | Reports lagbacks |
 | **Shulker Dyer** | Dyes shulker boxes and bundles in crafting grids |
 | **Sign to Item Frame** | Shows the item a sign names on the sign |
-| **Smoother Freecam** | Freecam that speeds up and glides to a stop like creative flight, moves every frame, flies up and down where you look (up to 45° by default) and floats out to the third-person spot when turned on |
+| **Smoother Freecam** | Freecam that speeds up and glides to a stop like creative flight, moves every frame, flies up and down where you look (up to 45° by default) and floats out to the third-person spot when turned on, with a start height, optional chunk reloading and a drone mode that tilts and does flips |
 | **Storage GUI Tweaks** | Previews container contents at your crosshair and in tooltips, and tints shulker GUIs |
 | **Team Trees** | Plants saplings |
 | **Unobtrusive** | Moves or hides overlays and hand animations in the middle of the screen |

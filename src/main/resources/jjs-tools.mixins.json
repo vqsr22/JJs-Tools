@@ -13,6 +13,7 @@
 		"BlockRenderManagerMixin",
 		"BlurMixin",
 		"BossBarHudAccessor",
+		"CameraDroneMixin",
 		"CategoryAccessorMixin",
 		"CategoryControllerMixin",
 		"ClientConnectionDisconnectMixin",

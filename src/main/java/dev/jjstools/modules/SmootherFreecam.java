@@ -35,6 +35,7 @@ import java.lang.reflect.Field;
 public class SmootherFreecam extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgStart = settings.createGroup("Start");
+    private final SettingGroup sgDrone = settings.createGroup("Drone");
 
     private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
         .name("speed")
@@ -60,6 +61,12 @@ public class SmootherFreecam extends Module {
         .defaultValue(45).range(0, 90).sliderRange(0, 90)
         .build());
 
+    private final Setting<Boolean> reloadChunks = sgGeneral.add(new BoolSetting.Builder()
+        .name("reload-chunks")
+        .description("Reload the world's chunks when Freecam turns on and off, as Freecam's own setting does (so blocks hidden from where you stand show up). Off is quicker.")
+        .defaultValue(false)
+        .build());
+
     private final Setting<Boolean> startThirdPerson = sgStart.add(new BoolSetting.Builder()
         .name("start-in-third-person")
         .description("When Freecam turns on, float the camera out to where third person (F5) would put it. Any movement key takes over.")
@@ -80,6 +87,77 @@ public class SmootherFreecam extends Module {
         .visible(startThirdPerson::get)
         .build());
 
+    private final Setting<Double> startHeight = sgStart.add(new DoubleSetting.Builder()
+        .name("start-height")
+        .description("How far above the third-person spot the camera ends up, in blocks, so it looks down over you rather than at the back of your head.")
+        .defaultValue(1).min(-4).max(16).sliderRange(0, 6)
+        .visible(startThirdPerson::get)
+        .build());
+
+    // Drone
+
+    private final Setting<Boolean> drone = sgDrone.add(new BoolSetting.Builder()
+        .name("drone-mode")
+        .description("The camera tilts as it moves, like a drone: nose down going forward, banking into turns and strafes. Flip and roll keys do full flips.")
+        .defaultValue(false)
+        .build());
+
+    private final Setting<Double> maxTilt = sgDrone.add(new DoubleSetting.Builder()
+        .name("max-tilt")
+        .description("How far the camera tilts at full speed, in degrees.")
+        .defaultValue(22).range(0, 60).sliderRange(0, 45)
+        .visible(drone::get)
+        .build());
+
+    private final Setting<Double> tiltResponse = sgDrone.add(new DoubleSetting.Builder()
+        .name("tilt-response")
+        .description("How quickly the tilt follows the movement. Lower is floatier.")
+        .defaultValue(0.12).range(0.01, 1).sliderRange(0.02, 0.5)
+        .visible(drone::get)
+        .build());
+
+    private final Setting<meteordevelopment.meteorclient.utils.misc.Keybind> flipKey = sgDrone.add(new meteordevelopment.meteorclient.settings.KeybindSetting.Builder()
+        .name("flip-key")
+        .description("Does a front flip.")
+        .defaultValue(meteordevelopment.meteorclient.utils.misc.Keybind.none())
+        .visible(drone::get)
+        .build());
+
+    private final Setting<meteordevelopment.meteorclient.utils.misc.Keybind> backFlipKey = sgDrone.add(new meteordevelopment.meteorclient.settings.KeybindSetting.Builder()
+        .name("back-flip-key")
+        .description("Does a back flip.")
+        .defaultValue(meteordevelopment.meteorclient.utils.misc.Keybind.none())
+        .visible(drone::get)
+        .build());
+
+    private final Setting<meteordevelopment.meteorclient.utils.misc.Keybind> rollLeftKey = sgDrone.add(new meteordevelopment.meteorclient.settings.KeybindSetting.Builder()
+        .name("roll-left-key")
+        .description("Does a barrel roll to the left.")
+        .defaultValue(meteordevelopment.meteorclient.utils.misc.Keybind.none())
+        .visible(drone::get)
+        .build());
+
+    private final Setting<meteordevelopment.meteorclient.utils.misc.Keybind> rollRightKey = sgDrone.add(new meteordevelopment.meteorclient.settings.KeybindSetting.Builder()
+        .name("roll-right-key")
+        .description("Does a barrel roll to the right.")
+        .defaultValue(meteordevelopment.meteorclient.utils.misc.Keybind.none())
+        .visible(drone::get)
+        .build());
+
+    private final Setting<Double> flipTime = sgDrone.add(new DoubleSetting.Builder()
+        .name("flip-time")
+        .description("Seconds a flip or roll takes.")
+        .defaultValue(0.7).range(0.15, 3).sliderRange(0.2, 2)
+        .visible(drone::get)
+        .build());
+
+    /** The drone's tilt now, in radians: nose down (pitch) and bank (roll). */
+    private double tiltPitch, tiltRoll;
+    /** A flip or roll under way: which axis, its way round, and when it began (nanos), or not running. */
+    private int flipAxis, flipSign;
+    private long flipStart = -1;
+    private Boolean savedReload;
+
     private static Field speedValueField;
     private static boolean speedValueLooked;
 
@@ -94,7 +172,7 @@ public class SmootherFreecam extends Module {
     private double introT = -1;
 
     public SmootherFreecam() {
-        super(JJsTools.CATEGORY, "smoother-freecam", "Freecam that speeds up and glides to a stop like creative flight, moves every frame rather than every tick, can fly up and down where you look, and can float out to the third-person spot when turned on.");
+        super(JJsTools.CATEGORY, "smoother-freecam", "Freecam that speeds up and glides to a stop like creative flight, moves every frame rather than every tick, can fly up and down where you look, can float out to the third-person spot when turned on, and has a drone mode that tilts and flips.");
     }
 
     private static Freecam freecam() {
@@ -105,17 +183,105 @@ public class SmootherFreecam extends Module {
     @Override
     public void onActivate() {
         tracking = false;
+        tiltPitch = tiltRoll = 0;
+        flipStart = -1;
         Freecam freecam = freecam();
         turnedFreecamOn = freecam != null && !freecam.isActive();
+        // Freecam reads its reload-chunks setting as it turns on and off, so this one stands in
+        // for it for as long as this is on.
+        setFreecamReload(freecam, reloadChunks.get());
         if (turnedFreecamOn) freecam.toggle();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setFreecamReload(Freecam freecam, Boolean value) {
+        if (freecam == null) return;
+        Setting<?> setting = freecam.settings.get("reload-chunks");
+        if (!(setting != null && setting.get() instanceof Boolean current)) return;
+        if (value != null) {
+            if (savedReload == null) savedReload = current;
+            ((Setting<Boolean>) setting).set(value);
+        } else if (savedReload != null) {
+            ((Setting<Boolean>) setting).set(savedReload);
+            savedReload = null;
+        }
     }
 
     @Override
     public void onDeactivate() {
         Freecam freecam = freecam();
         if (turnedFreecamOn && freecam != null && freecam.isActive()) freecam.toggle();
+        setFreecamReload(freecam, null);
         turnedFreecamOn = false;
         tracking = false;
+        tiltPitch = tiltRoll = 0;
+        flipStart = -1;
+    }
+
+    // Drone
+
+    @meteordevelopment.orbit.EventHandler
+    private void onKey(meteordevelopment.meteorclient.events.meteor.KeyEvent event) {
+        if (!drone.get() || event.action != meteordevelopment.meteorclient.utils.misc.input.KeyAction.Press || mc.currentScreen != null) return;
+        if (dev.jjstools.compat.Compat.matches(flipKey.get(), event)) startFlip(0, -1);
+        else if (dev.jjstools.compat.Compat.matches(backFlipKey.get(), event)) startFlip(0, 1);
+        else if (dev.jjstools.compat.Compat.matches(rollLeftKey.get(), event)) startFlip(1, 1);
+        else if (dev.jjstools.compat.Compat.matches(rollRightKey.get(), event)) startFlip(1, -1);
+    }
+
+    private void startFlip(int axis, int sign) {
+        if (!tracking || flipStart >= 0) return;
+        flipAxis = axis;
+        flipSign = sign;
+        flipStart = System.nanoTime();
+    }
+
+    /** Eases the tilt toward what the movement asks for. dt in ticks. */
+    private void updateTilt(Freecam freecam, double dt) {
+        if (!drone.get()) {
+            tiltPitch = tiltRoll = 0;
+            return;
+        }
+        double yaw = Math.toRadians(freecam.yaw);
+        double fwd = vx * -Math.sin(yaw) + vz * Math.cos(yaw);
+        double right = vx * -Math.cos(yaw) + vz * -Math.sin(yaw);
+        double top = Math.max(1e-3, 0.5 * freecamSpeed(freecam) * speed.get());
+        double max = Math.toRadians(maxTilt.get());
+        double wantPitch = -MathHelper.clamp(fwd / top, -1, 1) * max;
+        double wantRoll = -MathHelper.clamp(right / top, -1, 1) * max;
+        double k = 1 - Math.pow(1 - tiltResponse.get(), dt);
+        tiltPitch += (wantPitch - tiltPitch) * k;
+        tiltRoll += (wantRoll - tiltRoll) * k;
+    }
+
+    /**
+     * The drone's turn of the camera on top of where it looks, in the camera's own frame, or
+     * null for none (CameraDroneMixin).
+     */
+    public static org.joml.Quaternionf droneRotation() {
+        Modules modules = Modules.get();
+        if (modules == null) return null;
+        SmootherFreecam self = modules.get(SmootherFreecam.class);
+        if (self == null || !self.isActive() || !self.drone.get() || !self.tracking) return null;
+        return self.rotation();
+    }
+
+    private org.joml.Quaternionf rotation() {
+        double flipPitch = 0, flipRoll = 0;
+        if (flipStart >= 0) {
+            double t = (System.nanoTime() - flipStart) / 1e9 / flipTime.get();
+            if (t >= 1) {
+                flipStart = -1;
+            } else {
+                double e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                double angle = flipSign * Math.PI * 2 * e;
+                if (flipAxis == 0) flipPitch = angle;
+                else flipRoll = angle;
+            }
+        }
+        double pitch = tiltPitch + flipPitch, roll = tiltRoll + flipRoll;
+        if (Math.abs(pitch) < 1e-5 && Math.abs(roll) < 1e-5) return null;
+        return new org.joml.Quaternionf().rotateX((float) pitch).rotateZ((float) roll);
     }
 
     /** Called at the start of every frame, before the camera is placed (GameRendererOverlayMixin). */
@@ -149,6 +315,7 @@ public class SmootherFreecam extends Module {
         // does not throw the camera across the map.
         double dt = Math.min((now - lastFrame) / 1e9, 0.1) * 20;
         lastFrame = now;
+        updateTilt(freecam, dt);
 
         Vec3d want = wanted(freecam);
         boolean held = want.lengthSquared() > 1e-10;
@@ -253,12 +420,13 @@ public class SmootherFreecam extends Module {
 
         double yaw = Math.toRadians(freecam.yaw), pitch = Math.toRadians(freecam.pitch);
         Vec3d look = new Vec3d(-Math.sin(yaw) * Math.cos(pitch), -Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
-        Vec3d to = eye.subtract(look.multiply(startDistance.get()));
+        Vec3d to = eye.subtract(look.multiply(startDistance.get())).add(0, startHeight.get(), 0);
         // Stop short of walls, as third person does.
         var hit = mc.world.raycast(new RaycastContext(eye, to, RaycastContext.ShapeType.VISUAL, RaycastContext.FluidHandling.NONE, mc.player));
         if (hit.getType() != HitResult.Type.MISS) {
+            Vec3d dir = to.subtract(eye).normalize();
             double dist = Math.max(0, hit.getPos().distanceTo(eye) - 0.2);
-            to = eye.subtract(look.multiply(dist));
+            to = eye.add(dir.multiply(dist));
         }
         if (to.squaredDistanceTo(from) < 0.01) return;
         introFrom = from;
