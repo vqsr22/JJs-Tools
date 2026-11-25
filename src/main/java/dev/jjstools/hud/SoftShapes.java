@@ -25,11 +25,22 @@ public final class SoftShapes {
         return t;
     }
 
+    /*
+     * Room is made in Meteor's mesh before anything is written to it. From 1.21.5 the mesh does
+     * not grow by itself as vertices are added (its own shapes ask for room first), and writing
+     * past its end crashed the game.
+     */
     private static int vertex(double x, double y, Color c) {
+        //#if MC >= 1.21.5
+        Renderer2D.COLOR.triangles.ensureCapacity(1, 0);
+        //#endif
         return Renderer2D.COLOR.triangles.vec2(x, y).color(c).next();
     }
 
     private static void tri(int a, int b, int c) {
+        //#if MC >= 1.21.5
+        Renderer2D.COLOR.triangles.ensureCapacity(0, 3);
+        //#endif
         Renderer2D.COLOR.triangles.triangle(a, b, c);
     }
 
