@@ -16,6 +16,7 @@ public class JJsHud {
         Hud.get().register(PacketGraphHud.INFO);
         dev.jjstools.util.ExordiumFixes.init();
         dev.jjstools.util.DisconnectReason.init();
+        dev.jjstools.util.FreecamGuard.init();
         dev.jjstools.util.PacketLimits.init();
     }
 }
