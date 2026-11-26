@@ -82,7 +82,6 @@ public final class LiteTab {
     private static Line[] nameLines = new Line[0];
     private static boolean[] spectator = new boolean[0];
     /** Per name: 0 none, 1 a friend's box, 2 a monitored player's box. */
-    private static byte[] highlight = new byte[0];
     /** Each name's drawn width, for the box round it. */
     private static float[] nameWidth = new float[0];
     private static List<OrderedText> headerLines = List.of();
@@ -99,6 +98,10 @@ public final class LiteTab {
     private static int listW;
     private static int boxW;
     private static float drawScale = 1f;
+
+    /** Where the tab list was last drawn, in GUI units, and when (System.nanoTime), so HUD elements can keep clear of it. */
+    public static float boundsLeft, boundsRight, boundsBottom;
+    public static long drawnAt;
     private static float originX;
     private static float originY;
 
@@ -207,6 +210,7 @@ public final class LiteTab {
         queuedLines.clear();
         queuedPos.clear();
         queued = false;
+        drawnAt = System.nanoTime();
 
         // Everything below is drawn in local coordinates, (0, 0) = top-left of the box.
         dev.jjstools.compat.Gui.push(ctx);
@@ -273,13 +277,6 @@ public final class LiteTab {
             }
         }
 
-        // Friends and monitored players: a soft highlight behind the name.
-        for (int i = 0; i < n; i++) {
-            if (highlight[i] == 0) continue;
-            int argb = highlight[i] == 2 ? module.monitoredColour.get().getPacked() : module.friendBoxColour.get().getPacked();
-            pill(ctx, listLeft + colX(i) + textOffset - 3, rowY(i, listTop) - 1, (int) Math.ceil(nameWidth[i]) + 5, ROW, argb);
-        }
-
         for (int i = 0; i < n; i++) {
             int x = listLeft + colX(i) + textOffset;
             int y = rowY(i, listTop);
@@ -313,17 +310,6 @@ public final class LiteTab {
      * A rounded rectangle through the GUI. The corners are quarter circles baked at the size
      * they come out on screen, so they stay smooth at any GUI and tab list scale.
      */
-    /**
-     * A soft highlight behind a name: a faint rounded tint with a slim rounded bar in the full
-     * colour at its left, both with the panel's smooth corners.
-     */
-    private static void pill(DrawContext ctx, int x, int y, int w, int h, int argb) {
-        int a = (argb >>> 24) & 0xFF;
-        int rgb = argb & 0xFFFFFF;
-        round(ctx, x, y, w, h, Math.min(3, h / 2), fade(((a * 50 / 255) << 24) | rgb));
-        round(ctx, x, y + 1, 2, h - 2, 1, fade(((a * 230 / 255) << 24) | rgb));
-    }
-
     private static void round(DrawContext ctx, int x, int y, int w, int h, int r, int argb) {
         r = Math.min(r, Math.min(w, h) / 2);
         if (r < 1) {
@@ -445,10 +431,8 @@ public final class LiteTab {
         names = new Text[n];
         nameLines = new Line[n];
         spectator = new boolean[n];
-        highlight = new byte[n];
         nameWidth = new float[n];
         TabOptimizer opts = meteordevelopment.meteorclient.systems.modules.Modules.get().get(TabOptimizer.class);
-        boolean friendBox = opts != null && opts.friendBox.get();
         java.util.Set<String> watched = new java.util.HashSet<>();
         if (opts != null) for (String w : opts.monitored.get()) watched.add(w.trim().toLowerCase(java.util.Locale.ROOT));
 
@@ -457,14 +441,14 @@ public final class LiteTab {
             PlayerListEntry e = entries[i];
             names[i] = hud.getPlayerName(e); // goes through Better Tab's friend/self colours
             spectator[i] = e.getGameMode() == GameMode.SPECTATOR;
-            // Friends in Meteor's friend colour whether or not Better Tab is on; under JJ's theme
+            // Monitored players in their own colour, friends in Meteor's friend colour whether or not Better Tab is on; under JJ's theme
             // everyone else in the plain text colour, the server's own name colours left out.
             int colour = 0;
             boolean friend = meteordevelopment.meteorclient.systems.friends.Friends.get().isFriend(e);
             String profileName = dev.jjstools.compat.Compat.name(e.getProfile());
-            if (profileName != null && watched.contains(profileName.toLowerCase(java.util.Locale.ROOT))) highlight[i] = 2;
-            else if (friend && friendBox) highlight[i] = 1;
-            if (friend && !friendBox) {
+            if (profileName != null && watched.contains(profileName.toLowerCase(java.util.Locale.ROOT))) {
+                colour = opts.monitoredColour.get().getPacked();
+            } else if (friend) {
                 colour = meteordevelopment.meteorclient.systems.config.Config.get().friendColor.get().getPacked();
             } else if (jj) {
                 colour = spectator[i] ? palette[5] : palette[4];
@@ -558,6 +542,9 @@ public final class LiteTab {
             originX = clamp(originX, EDGE + inset, screenW - EDGE - w + inset);
             originY = clamp(originY, EDGE + pad * drawScale, screenH - EDGE - h + pad * drawScale);
         }
+        boundsLeft = originX - inset;
+        boundsRight = boundsLeft + w;
+        boundsBottom = originY + h + pad * drawScale;
     }
 
     private static double fitScale(int listW, int textW, int boxH, int availW, int availH) {

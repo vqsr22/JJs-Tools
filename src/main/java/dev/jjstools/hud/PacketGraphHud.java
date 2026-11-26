@@ -245,8 +245,38 @@ public class PacketGraphHud extends HudElement {
         updateSize(renderer);
     }
 
+    /** How far the graph is moved down to keep clear of the tab list, eased in and out. */
+    private double tabShift;
+    private long shiftAt;
+
+    /** How far down the graph has to go to sit below the tab list while it is open, in HUD pixels. */
+    private double tabClearance() {
+        if (System.nanoTime() - dev.jjstools.tab.LiteTab.drawnAt > 100_000_000L) return 0;
+        double scale = net.minecraft.client.MinecraftClient.getInstance().getWindow().getScaleFactor();
+        double left = dev.jjstools.tab.LiteTab.boundsLeft * scale, right = dev.jjstools.tab.LiteTab.boundsRight * scale;
+        double bottom = dev.jjstools.tab.LiteTab.boundsBottom * scale;
+        if (x + getWidth() <= left || x >= right || y >= bottom) return 0;
+        return bottom + 4 * scale - y;
+    }
+
     @Override
     public void render(HudRenderer renderer) {
+        long now = System.nanoTime();
+        double dt = shiftAt == 0 ? 1 : Math.min(0.1, (now - shiftAt) / 1e9);
+        shiftAt = now;
+        double want = isInEditor() ? 0 : tabClearance();
+        tabShift += (want - tabShift) * (1 - Math.exp(-dt * 18));
+        if (Math.abs(want - tabShift) < 0.5) tabShift = want;
+        int shift = (int) Math.round(tabShift);
+        y += shift;
+        try {
+            draw(renderer);
+        } finally {
+            y -= shift;
+        }
+    }
+
+    private void draw(HudRenderer renderer) {
         updateSize(renderer);
         sample();
         Color[] c = colours();

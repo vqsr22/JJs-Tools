@@ -27,6 +27,18 @@ public final class FreecamGuard {
         MeteorClient.EVENT_BUS.subscribe(FreecamGuard.class);
     }
 
+    /**
+     * Before Meteor turns your saved modules back on as you join: Smoother Freecam is left off, so
+     * you join as yourself and not stuck in Freecam because it was on when you last played.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST + 100)
+    private static void onGameJoined(meteordevelopment.meteorclient.events.game.GameJoinedEvent event) {
+        Modules modules = Modules.get();
+        if (modules == null) return;
+        var smoother = modules.get(dev.jjstools.modules.SmootherFreecam.class);
+        if (smoother != null && smoother.isActive()) smoother.toggle();
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST + 100)
     private static void onTick(TickEvent.Post event) {
         MinecraftClient mc = MinecraftClient.getInstance();

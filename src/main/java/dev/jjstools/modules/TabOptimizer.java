@@ -38,7 +38,7 @@ public class TabOptimizer extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
     private final SettingGroup sgLite = settings.createGroup("Lite Renderer");
     private final SettingGroup sgColours = settings.createGroup("Colours");
-    private final SettingGroup sgHighlights = settings.createGroup("Highlights");
+    private final SettingGroup sgHighlights = settings.createGroup("Name Colours");
     private final SettingGroup sgHeads = settings.createGroup("Heads");
     private final SettingGroup sgPerformance = settings.createGroup("Performance");
 
@@ -188,33 +188,18 @@ public class TabOptimizer extends Module {
         .build()
     );
 
-    public final Setting<Boolean> friendBox = sgHighlights.add(new BoolSetting.Builder()
-        .name("friend-highlight")
-        .description("Show friends with a soft rounded highlight behind their name instead of in Meteor's friend colour. Lite renderer only.")
-        .defaultValue(true)
-        .onChanged(v -> LiteTab.invalidate())
-        .build()
-    );
-
-    public final Setting<SettingColor> friendBoxColour = sgHighlights.add(new ColorSetting.Builder()
-        .name("friend-highlight-colour")
-        .description("Colour of the highlight behind friends' names.")
-        .defaultValue(new SettingColor(110, 200, 225))
-        .visible(friendBox::get)
-        .build()
-    );
-
     public final Setting<java.util.List<String>> monitored = sgHighlights.add(new meteordevelopment.meteorclient.settings.StringListSetting.Builder()
         .name("monitored-players")
-        .description("Names to pick out in the tab list with a highlight of their own colour. Not case sensitive. Lite renderer only.")
+        .description("Names to show in the tab list in a colour of their own. Not case sensitive. Lite renderer only.")
         .onChanged(v -> LiteTab.invalidate())
         .build()
     );
 
     public final Setting<SettingColor> monitoredColour = sgHighlights.add(new ColorSetting.Builder()
-        .name("monitored-highlight-colour")
-        .description("Colour of the highlight behind monitored players' names.")
+        .name("monitored-colour")
+        .description("Colour of monitored players' names.")
         .defaultValue(new SettingColor(235, 110, 110))
+        .onChanged(v -> LiteTab.invalidate())
         .build()
     );
 
