@@ -40,7 +40,7 @@ public class SmootherFreecam extends Module {
     private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
         .name("speed")
         .description("Top speed, as a multiple of Freecam's own speed. 1 is Freecam's speed; 2 is twice as fast.")
-        .defaultValue(1).min(0.05).max(20).sliderRange(0.1, 5)
+        .defaultValue(4.5).min(0.05).max(20).sliderRange(0.1, 10)
         .build());
 
     private final Setting<Double> acceleration = sgGeneral.add(new DoubleSetting.Builder()
@@ -52,7 +52,7 @@ public class SmootherFreecam extends Module {
     private final Setting<Double> glide = sgGeneral.add(new DoubleSetting.Builder()
         .name("glide")
         .description("How quickly it slows down once no key is held: the share of its speed lost each tick. Lower glides further. Creative flight loses about 0.09.")
-        .defaultValue(0.09).min(0.01).max(1).sliderRange(0.02, 0.5)
+        .defaultValue(0.25).min(0.01).max(1).sliderRange(0.02, 0.5)
         .build());
 
     private final Setting<Double> pitchLimit = sgGeneral.add(new DoubleSetting.Builder()
@@ -90,7 +90,7 @@ public class SmootherFreecam extends Module {
     private final Setting<Double> startHeight = sgStart.add(new DoubleSetting.Builder()
         .name("start-height")
         .description("How far above the third-person spot the camera ends up, in blocks, so it looks down over you rather than at the back of your head.")
-        .defaultValue(1).min(-4).max(16).sliderRange(0, 6)
+        .defaultValue(0.8).min(-4).max(16).sliderRange(0, 6)
         .visible(startThirdPerson::get)
         .build());
 
@@ -179,6 +179,8 @@ public class SmootherFreecam extends Module {
 
     public SmootherFreecam() {
         super(JJsTools.CATEGORY, "smoother-freecam", "Freecam that speeds up and glides to a stop like creative flight, moves every frame rather than every tick, can fly up and down where you look, can float out to the third-person spot when turned on, and has a drone mode that tilts and flips.");
+        // Mouse 4 (the back side button) by default.
+        keybind.set(false, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4, 0);
     }
 
     private static Freecam freecam() {
