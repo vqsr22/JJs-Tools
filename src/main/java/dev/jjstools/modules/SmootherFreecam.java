@@ -94,6 +94,12 @@ public class SmootherFreecam extends Module {
         .visible(startThirdPerson::get)
         .build());
 
+    @meteordevelopment.orbit.EventHandler
+    private void onGameLeft(meteordevelopment.meteorclient.events.game.GameLeftEvent event) {
+        // Off as you leave, so you join next time as yourself, not stuck in Freecam.
+        toggle();
+    }
+
     // Drone
 
     private final Setting<Boolean> drone = sgDrone.add(new BoolSetting.Builder()
@@ -182,6 +188,12 @@ public class SmootherFreecam extends Module {
 
     @Override
     public void onActivate() {
+        if (mc.world == null || mc.player == null) {
+            // Back on from your saved config as the game starts, which would put you in Freecam
+            // the moment you join. Like Freecam itself, it is only on once you turn it on.
+            toggle();
+            return;
+        }
         tracking = false;
         tiltPitch = tiltRoll = 0;
         flipStart = -1;
