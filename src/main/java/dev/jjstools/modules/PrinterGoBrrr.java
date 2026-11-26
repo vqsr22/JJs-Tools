@@ -263,8 +263,6 @@ public class PrinterGoBrrr extends Module {
     public PrinterGoBrrr() {
         super(JJsTools.CATEGORY, "printer-go-brrr", "Automatically places blocks of Litematica schematics.");
         MeteorClient.EVENT_BUS.subscribe(esp);
-        // Toggled with Z unless you bind it to something else.
-        keybind.set(true, org.lwjgl.glfw.GLFW.GLFW_KEY_Z, 0);
     }
 
     private int ticks;

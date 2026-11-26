@@ -56,7 +56,7 @@ public class ElytraTakeoff extends Module {
     private final Setting<Keybind> takeoffKey = sgGeneral.add(new KeybindSetting.Builder()
         .name("takeoff-key")
         .description("Jump, open the elytra and fire a rocket. In the air or already gliding, it just fires a rocket.")
-        .defaultValue(Keybind.fromButton(GLFW.GLFW_MOUSE_BUTTON_MIDDLE))
+        .defaultValue(Keybind.none())
         .action(this::onTakeoffKey)
         .build()
     );

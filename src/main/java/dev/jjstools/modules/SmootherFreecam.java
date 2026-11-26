@@ -179,8 +179,6 @@ public class SmootherFreecam extends Module {
 
     public SmootherFreecam() {
         super(JJsTools.CATEGORY, "smoother-freecam", "Freecam that speeds up and glides to a stop like creative flight, moves every frame rather than every tick, can fly up and down where you look, can float out to the third-person spot when turned on, and has a drone mode that tilts and flips.");
-        // Mouse 4 (the back side button) by default.
-        keybind.set(false, org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_4, 0);
     }
 
     private static Freecam freecam() {
