@@ -40,7 +40,7 @@ public class SmootherFreecam extends Module {
     private final Setting<Double> speed = sgGeneral.add(new DoubleSetting.Builder()
         .name("speed")
         .description("Top speed, as a multiple of Freecam's own speed. 1 is Freecam's speed; 2 is twice as fast.")
-        .defaultValue(4.5).min(0.05).max(20).sliderRange(0.1, 10)
+        .defaultValue(4.5).min(0.05).max(20).sliderRange(0.1, 5)
         .build());
 
     private final Setting<Double> acceleration = sgGeneral.add(new DoubleSetting.Builder()
