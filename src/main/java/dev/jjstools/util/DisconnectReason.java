@@ -77,11 +77,13 @@ public final class DisconnectReason {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     private static void onSent(PacketEvent.Sent event) {
-        note(sent, event.packet);
         String who = senderMod();
+        String type = typeOf(event.packet);
+        // Each of the last few sent is labelled with who sent it, unless the game did.
+        note(sent, who.equals(GAME_NAME) ? type : type + " (" + who + ")");
         long now = System.currentTimeMillis();
         synchronized (DisconnectReason.class) {
-            senders.addLast(new Sender(now, who));
+            senders.addLast(new Sender(now, who, type));
             while (!senders.isEmpty() && (senders.size() > 4000 || now - senders.peekFirst().at > WINDOW_MS)) senders.pollFirst();
         }
     }
@@ -89,7 +91,17 @@ public final class DisconnectReason {
     // Who sends what
 
     private static final long WINDOW_MS = 5000;
-    private record Sender(long at, String mod) {}
+    private record Sender(long at, String mod, String type) {}
+
+    /**
+     * Packets every client sends all the time just by playing: moving, ticking, answering the
+     * server. A mod that hooks the game's movement (RusherHack does, even with every module off)
+     * passes these on, so they say nothing about what got you kicked.
+     */
+    private static final java.util.Set<String> ROUTINE = java.util.Set.of(
+        "move_player_pos", "move_player_pos_rot", "move_player_rot", "move_player_status_only",
+        "client_tick_end", "keep_alive", "pong", "chunk_batch_received", "accept_teleportation",
+        "player_input", "player_loaded", "client_information", "custom_payload", "move_vehicle");
     private static final ArrayDeque<Sender> senders = new ArrayDeque<>();
     private static final String GAME_NAME = "the game itself";
 
@@ -156,10 +168,28 @@ public final class DisconnectReason {
             if (mod != null) return mod;
             // Dev runs and nested jars: the nearest mod path above it.
             for (var e : mods.entrySet()) if (where.startsWith(e.getKey())) return e.getValue();
-            return cls.getName();
+            return byPackage(cls);
         } catch (Throwable t) {
-            return cls.getName();
+            return byPackage(cls);
         }
+    }
+
+    /**
+     * A name for code loaded from outside any mod's jar, as clients that download themselves at
+     * launch are (RusherHack, Mio): the mod whose id is in its package, else the package's
+     * name part, so "org.rusherhack.client.impl.x" reads RusherHack, not an obfuscated class.
+     */
+    private static String byPackage(Class<?> cls) {
+        String[] parts = cls.getName().split("\\.");
+        for (var mod : net.fabricmc.loader.api.FabricLoader.getInstance().getAllMods()) {
+            String id = mod.getMetadata().getId();
+            if (id.length() < 4) continue;
+            for (int i = 0; i < Math.min(3, parts.length - 1); i++) {
+                if (parts[i].equalsIgnoreCase(id)) return mod.getMetadata().getName();
+            }
+        }
+        if (parts.length >= 3) return parts[1];
+        return cls.getName();
     }
 
     private static String modName(String id) {
@@ -167,14 +197,45 @@ public final class DisconnectReason {
             .map(m -> m.getMetadata().getName()).orElse(id);
     }
 
-    /** Packets sent in the last few seconds, by mod, most first. */
-    private static List<java.util.Map.Entry<String, Integer>> recentSenders(long now) {
-        java.util.Map<String, Integer> counts = new java.util.HashMap<>();
-        synchronized (DisconnectReason.class) {
-            for (Sender s : senders) if (now - s.at() <= WINDOW_MS) counts.merge(s.mod(), 1, Integer::sum);
+    /** What one mod sent in the last few seconds: in all, not counting routine packets, and by type. */
+    private static final class Sent {
+        final String mod;
+        int total, unusual;
+        final java.util.Map<String, Integer> types = new java.util.HashMap<>();
+        Sent(String mod) { this.mod = mod; }
+
+        /** Its most sent packet types, unusual ones first, e.g. "use_item 12, set_carried_item 4". */
+        String topTypes(int max) {
+            List<java.util.Map.Entry<String, Integer>> list = new ArrayList<>(types.entrySet());
+            list.sort((a, b) -> {
+                boolean ra = ROUTINE.contains(a.getKey()), rb = ROUTINE.contains(b.getKey());
+                if (ra != rb) return ra ? 1 : -1;
+                return b.getValue() - a.getValue();
+            });
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < Math.min(max, list.size()); i++) {
+                if (i > 0) out.append(", ");
+                out.append(list.get(i).getKey()).append(' ').append(list.get(i).getValue());
+            }
+            if (list.size() > max) out.append(", ...");
+            return out.toString();
         }
-        List<java.util.Map.Entry<String, Integer>> list = new ArrayList<>(counts.entrySet());
-        list.sort((a, b) -> b.getValue() - a.getValue());
+    }
+
+    /** Packets sent in the last few seconds, by mod, most first. */
+    private static List<Sent> recentSenders(long now) {
+        java.util.Map<String, Sent> by = new java.util.HashMap<>();
+        synchronized (DisconnectReason.class) {
+            for (Sender s : senders) {
+                if (now - s.at() > WINDOW_MS) continue;
+                Sent e = by.computeIfAbsent(s.mod(), Sent::new);
+                e.total++;
+                if (!ROUTINE.contains(s.type())) e.unusual++;
+                e.types.merge(s.type(), 1, Integer::sum);
+            }
+        }
+        List<Sent> list = new ArrayList<>(by.values());
+        list.sort((a, b) -> b.total - a.total);
         return list;
     }
 
@@ -189,13 +250,19 @@ public final class DisconnectReason {
         return null;
     }
 
-    private static void note(ArrayDeque<String> list, Packet<?> p) {
-        String name;
+    private static String typeOf(Packet<?> p) {
         try {
-            name = p.getPacketType().id().getPath();
+            return p.getPacketType().id().getPath();
         } catch (Throwable t) {
-            name = p.getClass().getSimpleName();
+            return p.getClass().getSimpleName();
         }
+    }
+
+    private static void note(ArrayDeque<String> list, Packet<?> p) {
+        note(list, typeOf(p));
+    }
+
+    private static void note(ArrayDeque<String> list, String name) {
         synchronized (DisconnectReason.class) {
             list.addLast(name);
             while (list.size() > KEEP) list.pollFirst();
@@ -298,29 +365,29 @@ public final class DisconnectReason {
         // Who was sending: servers kick (or drop) for too many packets, or the wrong ones, so
         // the mod sending the most is the likely one.
         var bySender = recentSenders(now);
-        int total = 0;
-        for (var e : bySender) total += e.getValue();
+        int total = 0, unusual = 0;
+        for (Sent e : bySender) {
+            total += e.total;
+            unusual += e.unusual;
+        }
         if (total > 0) {
-            String likely = null;
-            for (var e : bySender) {
-                if (!e.getKey().equals(GAME_NAME)) {
-                    likely = e.getKey();
-                    break;
-                }
+            // The mod sending the most packets beyond the routine ones (moving, ticking), which
+            // any mod hooking the game's movement passes on without doing anything itself.
+            Sent likely = null;
+            for (Sent e : bySender) {
+                if (!e.mod.equals(GAME_NAME) && e.unusual > 0 && (likely == null || e.unusual > likely.unusual)) likely = e;
             }
             if (likely != null && (now - byModAt >= 15_000 || byMod == null)) {
-                int n = 0;
-                for (var e : bySender) if (e.getKey().equals(likely)) n = e.getValue();
-                lines.add(Text.literal("Likely from: " + likely + " (sent " + n + " of your last " + total + " packets, in " + WINDOW_MS / 1000 + " s).").formatted(Formatting.GOLD));
+                lines.add(Text.literal("Likely from: " + likely.mod + " (sent " + likely.unusual + " of your last " + unusual
+                    + " non-movement packets in " + WINDOW_MS / 1000 + " s: " + likely.topTypes(3) + ").").formatted(Formatting.GOLD));
             }
-            StringBuilder who = new StringBuilder("Packets sent in the last " + WINDOW_MS / 1000 + " s: ");
+            lines.add(Text.literal("Packets sent in the last " + WINDOW_MS / 1000 + " s (" + total + "):").formatted(Formatting.GRAY));
             int shown = 0;
-            for (var e : bySender) {
+            for (Sent e : bySender) {
                 if (shown++ == 5) break;
-                if (shown > 1) who.append(", ");
-                who.append(e.getKey()).append(' ').append(e.getValue());
+                String note = e.unusual == 0 && !e.mod.equals(GAME_NAME) ? " - only movement and ticking, the game's own, passed through it" : "";
+                lines.add(Text.literal("  " + e.mod + " " + e.total + ": " + e.topTypes(4) + note).formatted(Formatting.GRAY));
             }
-            lines.add(Text.literal(who.toString()).formatted(Formatting.GRAY));
         }
 
         if (joinedAt > 0) lines.add(Text.literal(String.format("In the world for %.1f s.", (now - joinedAt) / 1000.0)).formatted(Formatting.GRAY));
