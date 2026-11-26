@@ -18,6 +18,7 @@
 		"CategoryControllerMixin",
 		"ClientConnectionDisconnectMixin",
 		"ClientPlayNetworkHandlerMixin",
+		"FreecamTickMixin",
 		"DisconnectedScreenMixin",
 		"ClientPlayNetworkHandlerPickupMixin",
 		"DoorBlockMixin",
