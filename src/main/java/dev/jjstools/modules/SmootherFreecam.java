@@ -299,6 +299,13 @@ public class SmootherFreecam extends Module {
             tracking = false;
             return;
         }
+        if (dev.jjstools.util.FreecamGuard.strayed(freecam)) {
+            // A new world, or moved far away (2b2t's queue to the main server): the camera was
+            // left where you were before, out of reach of the blocks around you, so everything
+            // looked like void. It starts again at your player.
+            dev.jjstools.util.FreecamGuard.recentre(freecam);
+            tracking = false;
+        }
         if (!tracking) {
             // Freecam has just come on: start from where it put the camera.
             tracking = true;
