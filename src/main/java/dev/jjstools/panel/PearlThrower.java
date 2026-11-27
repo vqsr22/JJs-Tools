@@ -38,13 +38,12 @@ import java.util.List;
  *
  * Pulling whispers the pearlbot, which flips a trapdoor and brings you to the base. You arrive
  * where your pearl was, so the chamber is the column straight under the middle of you as you
- * land: nothing is searched for, so a chamber beside it is never taken for yours. A couple of seconds later you need a pearl: one you already carry, or one the
- * bot handed you. Without one, Baritone walks you to the container you saved for that base and
- * takes a single pearl. Then you walk onto dry ground beside that chamber, across from its
- * trapdoor where there is room, flip the trapdoor back if it has been left the wrong way,
- * crouch-walk to the edge, throw a pearl through the very middle of the chamber's opening (aimed
- * from the pearl's real flight, so it never clips a wall) and walk a block back, ready for next
- * time.
+ * land: nothing is searched for, so a chamber beside it is never taken for yours. A couple of
+ * seconds later you need a pearl: one you already carry, or one the bot handed you. Without one,
+ * Baritone walks you to the container you saved for that base and takes a single pearl. Then you
+ * go back to where you landed, straight over the chamber, crouch into the very middle of that
+ * block, flip the trapdoor back if it has been left the wrong way, throw a pearl straight down
+ * the middle of the chamber and walk a block back, standing, ready for next time.
  *
  * Each pearlbot is saved with the name of its base and its pearl container, from the pearls
  * panel, which is what starts it. Its options live in the Control Panel module's Pearls group.
@@ -80,7 +79,7 @@ public final class PearlThrower {
         int last = -1;
     }
 
-    private enum Step { Idle, Arriving, Settling, ToChest, Opening, ToStand, Flipping, Edging, Aiming, Throwing, Letting, Retrieving }
+    private enum Step { Idle, Arriving, Settling, ToChest, Opening, ToStand, Centring, Flipping, Edging, Aiming, Throwing, Letting, Retrieving }
 
     private Saved saved;
     private Bot job;
@@ -530,8 +529,8 @@ public final class PearlThrower {
         // keys do anything, only the mouse; the steps below press what they need. This runs
         // before your player moves each tick, so a key you press in between is let go first.
         if (step != Step.Arriving) {
-            boolean crouching = step == Step.Edging || step == Step.Aiming || step == Step.Throwing || step == Step.Letting;
-            mc.options.forwardKey.setPressed(step == Step.Edging);
+            boolean crouching = step == Step.Centring || step == Step.Flipping || step == Step.Aiming || step == Step.Throwing;
+            mc.options.forwardKey.setPressed(step == Step.Centring);
             mc.options.backKey.setPressed(step == Step.Letting);
             mc.options.leftKey.setPressed(false);
             mc.options.rightKey.setPressed(false);
@@ -568,7 +567,8 @@ public final class PearlThrower {
                         fail("No stasis chamber straight under where you landed.");
                         return;
                     }
-                    stand = standSpot(chamber);
+                    // Thrown from where you landed, straight down into the chamber under you.
+                    stand = landing;
                 }
                 // Facing the trapdoor the whole time you wait, so anything dropped to make room
                 // for a pearl lands on it, against the wall, and never goes the pearlbot's way.
@@ -675,18 +675,40 @@ public final class PearlThrower {
             }
             case ToStand -> {
                 if (stand == null) {
-                    fail("No room to stand across from the chamber's trapdoor.");
+                    fail("Lost where you landed.");
                     return;
                 }
-                // Baritone counts the spot reached anywhere in the block, so that is what counts here
-                // too; the walk to the edge works from wherever in it you are.
-                if (mc.player.getBlockPos().equals(stand) && mc.player.isOnGround()) {
+                // Back over the chamber, anywhere in the block; then centred exactly.
+                if (mc.player.getBlockX() == stand.getX() && mc.player.getBlockZ() == stand.getZ() && mc.player.isOnGround()) {
                     if (walking) StashWalker.stopPath();
                     walking = false;
+                    go(Step.Centring, "resetting the chamber");
+                    return;
+                }
+                if (elapsed() > 90_000 || !keepWalking(stand, true)) fail("Could not get back over the chamber.");
+            }
+            case Centring -> {
+                // Crouch-walk to the very middle of the block, so straight down from you is
+                // straight down the middle of the chamber.
+                Vec3d at = dev.jjstools.compat.Compat.pos(mc.player);
+                double cx = stand.getX() + 0.5 - at.x, cz = stand.getZ() + 0.5 - at.z;
+                double off = Math.sqrt(cx * cx + cz * cz);
+                if (rubberbanded(300) || mc.player.getBlockX() != stand.getX() || mc.player.getBlockZ() != stand.getZ()) {
+                    backToStand();
+                    return;
+                }
+                if (off < 0.04 || (elapsed() > 2500 && off < 0.12)) {
+                    mc.options.forwardKey.setPressed(false);
                     go(Step.Flipping, "resetting the chamber");
                     return;
                 }
-                if (elapsed() > 90_000 || !keepWalking(stand, true)) fail("Could not reach the throw spot.");
+                if (elapsed() > 4000) {
+                    fail("Could not get to the middle of the block over the chamber.");
+                    return;
+                }
+                mc.player.setYaw((float) Math.toDegrees(Math.atan2(cz, cx)) - 90F);
+                // Close in: a tap at a time, so it does not overshoot the middle.
+                mc.options.forwardKey.setPressed(off > 0.15 || mc.player.age % 3 == 0);
             }
             case Flipping -> {
                 if (rubberbanded(300) || mc.player.getEyePos().squaredDistanceTo(Vec3d.ofCenter(trapdoor)) > 4.5 * 4.5) {
@@ -702,11 +724,8 @@ public final class PearlThrower {
                 boolean want = ControlPanel.pearlTrapdoorOpen();
                 // No trapdoor in the column: nothing to flip, straight on to the throw.
                 if (noTrapdoor || state.get(Properties.OPEN) == want) {
-                    // Crouching keeps you from stepping off the edge into the water.
                     mc.options.sneakKey.setPressed(true);
-                    lastPast = past();
-                    stalled = 0;
-                    go(Step.Edging, null);
+                    go(Step.Aiming, null);
                     return;
                 }
                 // Give each flip a moment to come back from the server before trying again.
@@ -766,26 +785,9 @@ public final class PearlThrower {
                 if (elapsed() < 250) return;
                 Vec3d v = mc.player.getVelocity();
                 if (v.x * v.x + v.z * v.z > 0.003 * 0.003 && elapsed() < 1200) return;
-                // Not out over the opening far enough for the pearl to clear the edge you stand
-                // on: lean out again rather than throw into it.
-                if (past() < 0.14) {
-                    if (++leanTries > 3) {
-                        fail("Could not lean out over the chamber far enough to throw cleanly.");
-                        return;
-                    }
-                    lastPast = past();
-                    stalled = 0;
-                    step = Step.Edging;
-                    since = System.currentTimeMillis();
-                    return;
-                }
-                // Into the very middle of the chamber's water, worked out from how a pearl
-                // actually flies. Aimed at the water rather than the opening, it stays on your side
-                // of the shaft the whole way down and arrives in the middle, never crossing to the
-                // far wall or the open trapdoor against it.
-                float[] aim = aimThrough(waterCentre());
-                mc.player.setYaw(aim[0]);
-                mc.player.setPitch(aim[1]);
+                // Straight down: the chamber is right under the middle of you, so the pearl drops
+                // down the middle of it and touches no wall.
+                mc.player.setPitch(90);
                 go(Step.Throwing, null);
             }
             case Throwing -> {
@@ -810,11 +812,10 @@ public final class PearlThrower {
                 go(Step.Letting, null);
             }
             case Letting -> {
-                // A block straight back from where you threw, walking, not crouched, facing the
-                // water and looking straight ahead.
+                // A block straight back from where you threw, walking, not crouched, looking
+                // straight ahead.
                 mc.options.sneakKey.setPressed(false);
                 if (freeLookMode == null) mc.player.setPitch(0);
-                mc.player.setYaw((float) Rotations.getYaw(Vec3d.ofCenter(water)));
                 mc.options.backKey.setPressed(true);
                 Vec3d at = dev.jjstools.compat.Compat.pos(mc.player);
                 double bx = at.x - thrownFrom.x, bz = at.z - thrownFrom.z;
