@@ -84,8 +84,12 @@ public class PearlsPanel extends Panel {
 
         // Top: what it is doing, and a new pearlbot.
         int nw = ui.width("new") + 24;
+        // After a pull was stopped for its cooldown: a button to pull there anyway.
+        Bot waited = m.waitedOn();
+        int aw = waited != null ? ui.width("pull anyway") + 20 : 0;
+        if (waited != null) ui.button(x + w - nw - gap - aw, y, aw, bh, "pull anyway", connected(), m::pullAnyway);
         String status = m.status();
-        ui.text(ui.fit(status, w - nw - 6), x, y + (bh - ui.lineH()) / 2 + 1, m.running() ? ui.accent() : ui.fgDim());
+        ui.text(ui.fit(status, w - nw - aw - (aw > 0 ? gap : 0) - 6), x, y + (bh - ui.lineH()) / 2 + 1, m.running() ? ui.accent() : ui.fgDim());
         if (m.running()) ui.button(x + w - nw, y, nw, bh, "stop", true, m::cancel);
         else ui.button(x + w - nw, y, nw, bh, "new", true, () -> {
             select(m.add());
@@ -188,6 +192,10 @@ public class PearlsPanel extends Panel {
 
         String where = "pearl chest " + coords(b.chest, Prefs.get().hideCoords, "not set");
         ui.small(ui.fitSmall(where, w), x, ey + 2, ui.fgDim());
+    }
+
+    private static boolean connected() {
+        return MinecraftClient.getInstance().player != null;
     }
 
     private static String coords(int[] p, boolean hide, String none) {

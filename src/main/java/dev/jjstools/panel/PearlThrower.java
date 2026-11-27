@@ -94,6 +94,25 @@ public final class PearlThrower {
     public static final long MESSAGE_COOLDOWN_MS = 60_000;
     private final java.util.Map<String, Long> messageAt = new java.util.HashMap<>();
     private String messagingBot;
+    /** The pearlbot whose pull was just stopped for its cooldown, to offer pulling anyway; null if none. */
+    private Bot waitedOn;
+    private boolean ignoreCooldown;
+
+    public Bot waitedOn() {
+        return running() ? null : waitedOn;
+    }
+
+    /** Pulls at the pearlbot that was stopped for its cooldown, sending the message regardless. */
+    public void pullAnyway() {
+        Bot b = waitedOn;
+        if (b == null || running()) return;
+        ignoreCooldown = true;
+        try {
+            run(b, true);
+        } finally {
+            ignoreCooldown = false;
+        }
+    }
     /** Waiting to see the pull message leave; the pull is cancelled if it does not. */
     private boolean awaitingMessage;
     private long messageAskedAt;
@@ -239,6 +258,7 @@ public final class PearlThrower {
     /** Pulls the pearl at this base and resets the chamber after; or, without pulling, only resets it. */
     public void run(Bot b, boolean pull) {
         if (b == null || running()) return;
+        waitedOn = null;
         job = b;
         pullQueued = pull;
         saved().last = bots().indexOf(b);
@@ -397,11 +417,12 @@ public final class PearlThrower {
                 return;
             }
             double wait = messageWait(job);
-            if (wait > 0) {
+            if (wait > 0 && !ignoreCooldown) {
                 // It would not be sent, so there is nothing to wait for: no pull.
                 int secs = (int) Math.ceil(wait);
                 ChatUtils.warning("Wait %ds before pulling at %s: 2b2t allows one message a minute to each person.", secs, job.label());
                 stop("wait " + secs + "s");
+                waitedOn = job;
                 return;
             }
             String msg = template.trim().replace("{bot}", job.bot).replace("{player}", dev.jjstools.compat.Compat.name(mc.player.getGameProfile()));
