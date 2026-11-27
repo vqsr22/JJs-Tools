@@ -87,24 +87,31 @@ public final class PearlThrower {
     private boolean pullQueued;
 
     /**
-     * 2b2t lets you send a message only once a minute, so a pull message sent within a minute of
-     * the last one never goes. When the last pull message actually left, for the cooldown ring.
+     * 2b2t lets you message the same person only once a minute, so a pull message sent within a
+     * minute of the last one to that pearlbot never goes. When the last pull message to each
+     * pearlbot (by username, lower case) actually left, for the cooldown ring.
      */
     public static final long MESSAGE_COOLDOWN_MS = 60_000;
-    private long messageAt;
+    private final java.util.Map<String, Long> messageAt = new java.util.HashMap<>();
+    private String messagingBot;
     /** Waiting to see the pull message leave; the pull is cancelled if it does not. */
     private boolean awaitingMessage;
     private long messageAskedAt;
 
-    /** Seconds until a pull message can be sent again; 0 when it can. */
-    public double messageWait() {
-        if (messageAt == 0) return 0;
-        return Math.max(0, (MESSAGE_COOLDOWN_MS - (System.currentTimeMillis() - messageAt)) / 1000.0);
+    private static String key(Bot b) {
+        return b == null || b.bot == null ? "" : b.bot.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** How far through the cooldown it is: 0 just sent, 1 ready. */
-    public double messageReady() {
-        return 1 - messageWait() * 1000.0 / MESSAGE_COOLDOWN_MS;
+    /** Seconds until a pull message can be sent to this pearlbot again; 0 when it can. */
+    public double messageWait(Bot b) {
+        Long at = messageAt.get(key(b));
+        if (at == null) return 0;
+        return Math.max(0, (MESSAGE_COOLDOWN_MS - (System.currentTimeMillis() - at)) / 1000.0);
+    }
+
+    /** How far through this pearlbot's cooldown it is: 0 just sent, 1 ready. */
+    public double messageReady(Bot b) {
+        return 1 - messageWait(b) * 1000.0 / MESSAGE_COOLDOWN_MS;
     }
     private Step step = Step.Idle;
     private long since;
@@ -318,7 +325,7 @@ public final class PearlThrower {
             || event.packet instanceof net.minecraft.network.packet.c2s.play.ChatCommandSignedC2SPacket
             || event.packet instanceof net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket) {
             awaitingMessage = false;
-            messageAt = System.currentTimeMillis();
+            messageAt.put(messagingBot, System.currentTimeMillis());
         }
     }
 
@@ -389,11 +396,11 @@ public final class PearlThrower {
                 stop("give " + job.label() + " a pull message first");
                 return;
             }
-            double wait = messageWait();
+            double wait = messageWait(job);
             if (wait > 0) {
                 // It would not be sent, so there is nothing to wait for: no pull.
                 int secs = (int) Math.ceil(wait);
-                ChatUtils.warning("Wait %ds before pulling: 2b2t allows one message a minute.", secs);
+                ChatUtils.warning("Wait %ds before pulling at %s: 2b2t allows one message a minute to each person.", secs, job.label());
                 stop("wait " + secs + "s");
                 return;
             }
@@ -401,6 +408,7 @@ public final class PearlThrower {
             // Plain words are whispered to the pearlbot; a command is sent as it is.
             if (!msg.startsWith("/")) msg = "/msg " + job.bot + " " + msg;
             awaitingMessage = true;
+            messagingBot = key(job);
             messageAskedAt = System.currentTimeMillis();
             ChatUtils.sendPlayerMsg(msg);
             go(Step.Arriving, "pulling at " + job.label());

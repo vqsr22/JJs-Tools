@@ -29,6 +29,8 @@ public class PearlsPanel extends Panel {
     private final TextBox message = new TextBox("pull message (eg. load base or warp)");
     private final double[] scroll = { 0 };
     private Bot selected;
+    /** Whether the editor for the selected pearlbot is showing. The height it adds is extraH. */
+    private boolean expanded;
 
     public PearlsPanel() {
         super("pearls", "pearls", Items.ENDER_PEARL.getDefaultStack(), 170, 150);
@@ -85,10 +87,21 @@ public class PearlsPanel extends Panel {
         String status = m.status();
         ui.text(ui.fit(status, w - nw - 6), x, y + (bh - ui.lineH()) / 2 + 1, m.running() ? ui.accent() : ui.fgDim());
         if (m.running()) ui.button(x + w - nw, y, nw, bh, "stop", true, m::cancel);
-        else ui.button(x + w - nw, y, nw, bh, "new", true, () -> select(m.add()));
+        else ui.button(x + w - nw, y, nw, bh, "new", true, () -> {
+            select(m.add());
+            expanded = true;
+        });
 
-        // The editor for the chosen pearlbot takes the bottom; the list gets the rest.
-        int editH = selected == null ? 0 : bh * 3 + gap * 2 + ui.smallH() + 6;
+        // The editor for the chosen pearlbot takes the bottom, only once a row is clicked open;
+        // the window grows by its height to make room, and shrinks back when it is closed.
+        int fullEditH = bh * 3 + gap * 2 + ui.smallH() + 6;
+        if (expanded && selected == null) expanded = false;
+        int want = expanded ? fullEditH + gap : 0;
+        if (want != extraH && restore == null) {
+            this.h += want - extraH;
+            extraH = want;
+        }
+        int editH = expanded ? fullEditH : 0;
         int ly = y + bh + gap;
         int lh = h - (ly - y) - (editH > 0 ? editH + gap : 0);
         int row = bh + 4;
@@ -102,12 +115,19 @@ public class PearlsPanel extends Panel {
         for (Bot b : bots) {
             Bot it = b;
             boolean busy = m.current() == b;
-            if (b == selected) ui.fill(x + 1, cy, w - 2, row, ui.rowHover());
+            if (b == selected && expanded) ui.fill(x + 1, cy, w - 2, row, ui.rowHover());
             else if (ui.hovered(x + 1, cy, w - 8, row)) ui.fill(x + 1, cy, w - 8, row, ui.rowHover());
             int buttons = bw * 2 + gap;
             int bx = x + w - 9 - buttons;
             int ringW = row - 10 + 5;
-            ui.onClick(x + 1, cy, bx - ringW - x - 2, row, () -> select(it));
+            ui.onClick(x + 1, cy, bx - ringW - x - 2, row, () -> {
+                // Opens this one's editor; clicking it again closes it.
+                if (it == selected && expanded) expanded = false;
+                else {
+                    select(it);
+                    expanded = true;
+                }
+            });
             int ty = cy + (row - ui.lineH()) / 2 + 1;
             String label = ui.fit(b.label(), bx - ringW - x - 12);
             ui.text(label, x + 6, ty, busy ? ui.accent() : ui.fgWell());
@@ -120,10 +140,10 @@ public class PearlsPanel extends Panel {
             // a pull message can be sent.
             int rs = row - 10;
             int rx = bx - rs - 5, ry = cy + (row - rs) / 2;
-            double wait = m.messageWait();
+            double wait = m.messageWait(b);
             if (wait > 0) {
                 ui.arc(rx, ry, rs, 1.5F, 1, 0x40FFFFFF);
-                ui.arc(rx, ry, rs, 1.5F, m.messageReady(), 0xFF4FA3FF);
+                ui.arc(rx, ry, rs, 1.5F, m.messageReady(b), 0xFF4FA3FF);
             } else {
                 ui.arc(rx, ry, rs, 1.5F, 1, 0xFF4CD964);
             }
@@ -134,7 +154,7 @@ public class PearlsPanel extends Panel {
         }
         ui.unclip();
 
-        if (selected == null) return;
+        if (selected == null || !expanded) return;
         Bot b = selected;
         int ey = ly + lh + gap;
         int half = (w - gap) / 2;
@@ -162,6 +182,7 @@ public class PearlsPanel extends Panel {
         ui.button(x + cw + gap, ey, w - cw - gap, bh, "delete", !m.running(), () -> {
             m.remove(b);
             select(null);
+            expanded = false;
         });
         ey += bh + gap;
 

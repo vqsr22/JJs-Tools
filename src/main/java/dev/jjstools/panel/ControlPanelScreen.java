@@ -121,6 +121,7 @@ public class ControlPanelScreen extends Screen {
             p.z = win.z;
             p.w = Math.max(p.minW, (int) (win.w * vw));
             p.h = Math.max(p.minH, (int) (win.h * vh));
+            p.extraH = 0;
             p.x = (int) (win.x * vw);
             p.y = (int) (win.y * vh);
             keepOnScreen(p);
@@ -221,7 +222,7 @@ public class ControlPanelScreen extends Screen {
             Prefs.Window win = prefs.windows.computeIfAbsent(p.id, k -> new Prefs.Window());
             win.open = p.open;
             win.z = p.z;
-            int[] r = p.restore != null ? p.restore : new int[] { p.x, p.y, p.w, p.h };
+            int[] r = p.restore != null ? p.restore : new int[] { p.x, p.y, p.w, p.h - p.extraH };
             win.maximised = p.restore != null;
             win.x = r[0] / (double) vw;
             win.y = r[1] / (double) vh;

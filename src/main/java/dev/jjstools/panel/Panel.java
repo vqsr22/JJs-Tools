@@ -25,6 +25,8 @@ public abstract class Panel {
     public float tabX, tabY;
     /** Where the window was before it was made to fill the screen, or null if it does not. */
     public int[] restore;
+    /** Height the panel has added to itself for something it is showing for now; left out when the size is saved. */
+    public int extraH;
 
     protected Panel(String id, String title, ItemStack icon, int minW, int minH) {
         this.id = id;
