@@ -1101,7 +1101,11 @@ public class StorageGuiTweaks extends Module {
 
             box = StorageMemory.ender();
             if (box == null) return false;
-            title = box.name() != null ? box.name() : Text.translatable("container.enderchest").getString();
+            // The hovered item's own name when it has been renamed (on 2b2t some are, some are
+            // not); otherwise the name your ender chest last opened with.
+            Text custom = stack.get(DataComponentTypes.CUSTOM_NAME);
+            if (custom != null) title = custom.getString();
+            else title = box.name() != null ? box.name() : Text.translatable("container.enderchest").getString();
         }
         else {
             return false;
