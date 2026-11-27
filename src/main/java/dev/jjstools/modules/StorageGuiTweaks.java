@@ -710,12 +710,27 @@ public class StorageGuiTweaks extends Module {
         progress = 0.0F;
     }
 
+    /** Drawn this frame already, just before the tab list (InGameHudTabMixin), so the list covers it. */
+    private boolean drawnUnderTab;
+
+    /** The crosshair preview, drawn just before the tab list. True if anything was drawn. */
+    public boolean drawUnderTab(net.minecraft.client.gui.DrawContext context) {
+        if (dev.jjstools.util.ExordiumFixes.active()) return false;
+        drawnUnderTab = true;
+        return renderPreview(context, context.getScaledWindowWidth());
+    }
+
     @EventHandler
     private void onRender2D(Render2DEvent event) {
         // Under Exordium this event only comes on the frames it lets the HUD draw, and what is
         // drawn here did not reach its saved copy at all, so the preview only showed with a
         // screen open. There it is drawn every frame from ScreenOverlay instead.
         if (dev.jjstools.util.ExordiumFixes.active()) return;
+        // Normally drawn before the tab list already; here only if the game skipped that.
+        if (drawnUnderTab) {
+            drawnUnderTab = false;
+            return;
+        }
         renderPreview(event.drawContext, event.screenWidth);
     }
 
