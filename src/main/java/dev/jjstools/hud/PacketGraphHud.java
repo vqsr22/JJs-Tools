@@ -10,11 +10,11 @@ import meteordevelopment.meteorclient.utils.render.color.SettingColor;
 
 /**
  * A live graph of how close you are to the server's packet limits: global, inventory and
- * interaction, each as a share of its limit, the top of the graph being the limit itself.
+ * interaction, each as a share of its limit (zoomed to the highest line with auto-scale).
  *
- * Drawn the way JJ's theme draws things: a rounded panel in the panel colour, a small dim title
- * and a legend of the three figures above a rounded well that holds the graph, the lines in the
- * accent colour and two colours beside it. Read twenty times a second and scrolled smoothly
+ * Drawn the way JJ's theme draws things: a rounded panel in the panel colour, a legend of the
+ * three figures (global, inv, int) above a rounded well that holds the graph, the lines in the
+ * accent colour and two colours beside it, or colours of your own. Read twenty times a second and scrolled smoothly
  * between readings, each line eased toward its newest value, with a soft fill under it and a
  * faint line at three quarters of the limit. Turn follow-jj-theme off to pick every colour.
  */
@@ -81,14 +81,11 @@ public class PacketGraphHud extends HudElement {
 
     // Text
 
-    private final Setting<Boolean> title = sgText.add(new BoolSetting.Builder()
-        .name("title").description("Write \"packets\" over the graph.").defaultValue(true).build());
-
     private final Setting<Boolean> legend = sgText.add(new BoolSetting.Builder()
-        .name("legend").description("The current count against each limit, beside a dot in the line's colour.").defaultValue(true).build());
+        .name("legend").description("Each line's name, its current count and its limit, in the line's colour: global, inv, int.").defaultValue(true).build());
 
     private final Setting<Double> textScale = sgText.add(new DoubleSetting.Builder()
-        .name("text-size").description("Size of the title and legend.")
+        .name("text-size").description("Size of the legend.")
         .defaultValue(0.8).range(0.3, 3).sliderRange(0.4, 2).build());
 
     private final Setting<Boolean> shadow = sgText.add(new BoolSetting.Builder()
@@ -125,7 +122,7 @@ public class PacketGraphHud extends HudElement {
         .defaultValue(new SettingColor(225, 225, 225)).visible(() -> !followTheme.get()).build());
 
     private final Setting<SettingColor> dimColour = sgColours.add(new ColorSetting.Builder()
-        .name("dim-text-colour").description("Colour of the title and the limits.")
+        .name("dim-text-colour").description("Colour of the limits in the legend.")
         .defaultValue(new SettingColor(130, 132, 138)).visible(() -> !followTheme.get()).build());
 
     private final Setting<SettingColor> globalColour = sgColours.add(new ColorSetting.Builder()
@@ -258,7 +255,7 @@ public class PacketGraphHud extends HudElement {
     }
 
     private double headerHeight(HudRenderer renderer) {
-        if (!title.get() && !legend.get()) return 0;
+        if (!legend.get()) return 0;
         return renderer.textHeight(shadow.get(), textScale.get()) + 3;
     }
 
@@ -365,37 +362,29 @@ public class PacketGraphHud extends HudElement {
     }
 
     private void drawHeader(HudRenderer renderer, double hx, double hy, double hw, Color[] c) {
+        if (!legend.get()) return;
         double scale = textScale.get();
         boolean sh = shadow.get();
-        double lx = hx + 1;
-        if (title.get()) {
-            renderer.text("packets", lx, hy, c[4], sh, scale);
-            lx += renderer.textWidth("packets", sh, scale) + 6;
-        }
-        if (!legend.get()) return;
 
         int[] now = { PacketLimits.global(), PacketLimits.inventory(), PacketLimits.interact() };
         int[] limits = { PacketLimits.globalLimit(), PacketLimits.inventoryLimit(), PacketLimits.interactLimit() };
         boolean[] on = { showGlobal.get(), showInventory.get(), showInteract.get() };
-        double th = renderer.textHeight(sh, scale);
-        double dot = Math.max(3, th * 0.45);
 
-        // Right-aligned, as the panel's figures are: each a dot, the count, and /limit dimmed.
-        double rx = hx + hw - 1;
-        for (int i = 2; i >= 0; i--) {
+        // Left to right: "global 12/1249  inv 3/79  int 0/9", each name in its line's colour,
+        // the count too (red near the limit), and the limit dimmed.
+        double lx = hx + 1, right = hx + hw - 1;
+        for (int i = 0; i < 3; i++) {
             if (!on[i]) continue;
+            String name = NAMES[i] + " ";
             String count = String.valueOf(now[i]);
             String limit = "/" + limits[i];
-            double share = now[i] / (double) limits[i];
-            // The figure in its line's colour, so each reads with its line; red near the limit.
-            Color figure = share >= 0.9 ? warnColour.get() : c[5 + i];
-            double wl = renderer.textWidth(limit, sh, scale), wc = renderer.textWidth(count, sh, scale);
-            double start = rx - wl - wc - dot - 3;
-            if (start < lx) break;
-            SoftShapes.circle(start + dot / 2, hy + th / 2 - 0.5, dot / 2, c[5 + i]);
-            renderer.text(count, start + dot + 3, hy, figure, sh, scale);
-            renderer.text(limit, start + dot + 3 + wc, hy, c[4], sh, scale);
-            rx = start - 7;
+            double wn = renderer.textWidth(name, sh, scale), wc = renderer.textWidth(count, sh, scale), wl = renderer.textWidth(limit, sh, scale);
+            if (lx + wn + wc + wl > right) break;
+            Color figure = now[i] / (double) limits[i] >= 0.9 ? warnColour.get() : c[5 + i];
+            renderer.text(name, lx, hy, c[5 + i], sh, scale);
+            renderer.text(count, lx + wn, hy, figure, sh, scale);
+            renderer.text(limit, lx + wn + wc, hy, c[4], sh, scale);
+            lx += wn + wc + wl + 8;
         }
     }
 

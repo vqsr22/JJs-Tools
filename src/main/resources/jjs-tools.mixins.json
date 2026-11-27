@@ -16,6 +16,7 @@
 		"CameraDroneMixin",
 		"CategoryAccessorMixin",
 		"CategoryControllerMixin",
+		"ClientConnectionCountMixin",
 		"ClientConnectionDisconnectMixin",
 		"ClientPlayNetworkHandlerMixin",
 		"FreecamTickMixin",

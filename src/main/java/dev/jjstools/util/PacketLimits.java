@@ -1,9 +1,7 @@
 package dev.jjstools.util;
 
 import meteordevelopment.meteorclient.events.game.GameLeftEvent;
-import meteordevelopment.meteorclient.events.packets.PacketEvent;
 import meteordevelopment.orbit.EventHandler;
-import meteordevelopment.orbit.EventPriority;
 import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.c2s.play.ButtonClickC2SPacket;
 import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
@@ -82,13 +80,13 @@ public final class PacketLimits {
         return packet instanceof PlayerInteractBlockC2SPacket;
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    private static void onSent(PacketEvent.Sent event) {
+    /** Every packet as it leaves (ClientConnectionCountMixin), including ones sent around Meteor's events. */
+    public static void onSent(Packet<?> packet) {
         long now = System.currentTimeMillis();
         synchronized (PacketLimits.class) {
             global.addLast(now);
-            if (isInventory(event.packet)) inventory.addLast(now);
-            if (isInteract(event.packet)) interact.addLast(now);
+            if (isInventory(packet)) inventory.addLast(now);
+            if (isInteract(packet)) interact.addLast(now);
             // Old ones go here too, so nothing piles up while no one is reading the counts.
             trim(global, now - (long) (GLOBAL_WINDOW_MS * MAX_STRETCH));
             trim(inventory, now - (long) (INVENTORY_WINDOW_MS * MAX_STRETCH));
