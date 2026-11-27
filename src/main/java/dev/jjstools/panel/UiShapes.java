@@ -36,23 +36,36 @@ public final class UiShapes {
         });
     }
 
+    /** Steps round a whole ring for arc. */
+    public static final int ARC_STEPS = 360;
+
     /**
      * A ring, of the given thickness in pixels, drawn round from the top clockwise for the given
-     * number of 48ths: 48 for the whole ring.
+     * number of ARC_STEPS (all of them for the whole ring), with rounded ends. Kept apart from the
+     * other shapes, since a filling ring goes through many of these and would push them out.
      */
     static Shape arc(int size, int thick, int steps) {
-        return make("arc" + size + "t" + thick + "s" + steps, size, size, (x, y, w, h) -> {
+        return make(ARCS, 24, "arc" + size + "t" + thick + "s" + steps, size, size, (x, y, w, h) -> {
             double cx = w / 2.0, cy = h / 2.0;
             double dx = x - cx, dy = y - cy;
             double d = Math.sqrt(dx * dx + dy * dy);
-            double outer = w / 2.0, inner = outer - thick;
-            if (d > outer || d < inner) return false;
-            if (steps >= 48) return true;
-            double angle = Math.atan2(dx, -dy);
-            if (angle < 0) angle += Math.PI * 2;
-            return angle <= Math.PI * 2 * steps / 48.0;
+            double outer = w / 2.0, inner = outer - thick, mid = outer - thick / 2.0;
+            if (steps >= ARC_STEPS) return d <= outer && d >= inner;
+            double end = Math.PI * 2 * steps / ARC_STEPS;
+            if (d <= outer && d >= inner) {
+                double angle = Math.atan2(dx, -dy);
+                if (angle < 0) angle += Math.PI * 2;
+                if (angle <= end) return true;
+            }
+            // Rounded ends: a dot the ring's thickness at the start and at the end.
+            double r = thick / 2.0;
+            double sx = cx, sy = cy - mid;
+            double ex = cx + Math.sin(end) * mid, ey = cy - Math.cos(end) * mid;
+            return (x - sx) * (x - sx) + (y - sy) * (y - sy) <= r * r || (x - ex) * (x - ex) + (y - ey) * (y - ey) <= r * r;
         });
     }
+
+    private static final Map<String, Shape> ARCS = new LinkedHashMap<>(32, 0.75F, true);
 
     /** A thin chevron, pointing down or up, as on a drop-down. */
     static Shape chevron(int w, int h, boolean up) {
@@ -116,7 +129,11 @@ public final class UiShapes {
     }
 
     private static Shape make(String key, int w, int h, Inside inside) {
-        Shape shape = SHAPES.get(key);
+        return make(SHAPES, MAX, key, w, h, inside);
+    }
+
+    private static Shape make(Map<String, Shape> cache, int max, String key, int w, int h, Inside inside) {
+        Shape shape = cache.get(key);
         if (shape != null) return shape;
         w = Math.max(1, w);
         h = Math.max(1, h);
@@ -141,12 +158,12 @@ public final class UiShapes {
         texture.upload();
         MinecraftClient.getInstance().getTextureManager().registerTexture(id, texture);
         shape = new Shape(id, fw, fh);
-        SHAPES.put(key, shape);
+        cache.put(key, shape);
 
         // Sizes change with the GUI and text scale; the ones not drawn for a while go.
-        if (SHAPES.size() > MAX) {
-            String oldest = SHAPES.keySet().iterator().next();
-            Shape old = SHAPES.remove(oldest);
+        if (cache.size() > max) {
+            String oldest = cache.keySet().iterator().next();
+            Shape old = cache.remove(oldest);
             MinecraftClient.getInstance().getTextureManager().destroyTexture(old.id());
         }
         return shape;

@@ -84,12 +84,24 @@ public class PearlsPanel extends Panel {
 
         // Top: what it is doing, and a new pearlbot.
         int nw = ui.width("new") + 24;
-        // After a pull was stopped for its cooldown: a button to pull there anyway.
+        // After a pull was stopped for its cooldown: pull there anyway, or queue it for when the
+        // cooldown is over. While queued, a button to cancel that instead.
         Bot waited = m.waitedOn();
-        int aw = waited != null ? ui.width("pull anyway") + 20 : 0;
-        if (waited != null) ui.button(x + w - nw - gap - aw, y, aw, bh, "pull anyway", connected(), m::pullAnyway);
+        int used = nw;
+        if (waited != null) {
+            int aw = ui.width("pull anyway") + 20;
+            used += gap + aw;
+            ui.button(x + w - used, y, aw, bh, "pull anyway", connected(), m::pullAnyway);
+            int qw = ui.width("queue pull") + 20;
+            used += gap + qw;
+            ui.button(x + w - used, y, qw, bh, "queue pull", connected(), m::queuePull);
+        } else if (m.queued() != null && !m.running()) {
+            int cw0 = ui.width("cancel queue") + 20;
+            used += gap + cw0;
+            ui.button(x + w - used, y, cw0, bh, "cancel queue", true, m::cancelQueue);
+        }
         String status = m.status();
-        ui.text(ui.fit(status, w - nw - aw - (aw > 0 ? gap : 0) - 6), x, y + (bh - ui.lineH()) / 2 + 1, m.running() ? ui.accent() : ui.fgDim());
+        ui.text(ui.fit(status, w - used - 6), x, y + (bh - ui.lineH()) / 2 + 1, m.running() || m.queued() != null ? ui.accent() : ui.fgDim());
         if (m.running()) ui.button(x + w - nw, y, nw, bh, "stop", true, m::cancel);
         else ui.button(x + w - nw, y, nw, bh, "new", true, () -> {
             select(m.add());

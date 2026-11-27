@@ -775,7 +775,7 @@ public final class Ui {
      * of the way round (1 for the whole ring).
      */
     public void arc(int x, int y, int size, float thick, double fraction, int argb) {
-        int steps = (int) Math.round(Math.max(0, Math.min(1, fraction)) * 48);
+        int steps = (int) Math.round(Math.max(0, Math.min(1, fraction)) * UiShapes.ARC_STEPS);
         if (steps <= 0) return;
         int t = Math.max(1, Math.round(thick * pixelsPerUnit()));
         shape((pw, ph) -> UiShapes.arc(Math.min(pw, ph), t, steps), x, y, size, size, argb);

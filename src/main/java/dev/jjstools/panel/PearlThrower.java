@@ -99,7 +99,43 @@ public final class PearlThrower {
     private boolean ignoreCooldown;
 
     public Bot waitedOn() {
-        return running() ? null : waitedOn;
+        return running() || queued != null ? null : waitedOn;
+    }
+
+    /** The pearlbot queued to pull at as soon as its cooldown is over; null if none. */
+    private Bot queued;
+
+    public Bot queued() {
+        return queued;
+    }
+
+    /** Pulls at the pearlbot that was stopped for its cooldown once the cooldown is over. */
+    public void queuePull() {
+        if (waitedOn == null || running()) return;
+        queued = waitedOn;
+        waitedOn = null;
+    }
+
+    public void cancelQueue() {
+        if (queued != null) status = "queue cancelled";
+        queued = null;
+    }
+
+    @EventHandler
+    private void onQueueTick(TickEvent.Post event) {
+        if (queued == null) return;
+        if (mc.player == null || mc.world == null || !bots().contains(queued)) {
+            queued = null;
+            return;
+        }
+        double wait = messageWait(queued);
+        if (wait > 0 || running()) {
+            if (!running()) status = "queued: pulls in " + (int) Math.ceil(wait) + "s";
+            return;
+        }
+        Bot b = queued;
+        queued = null;
+        run(b, true);
     }
 
     /** Pulls at the pearlbot that was stopped for its cooldown, sending the message regardless. */
