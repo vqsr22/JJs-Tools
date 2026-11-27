@@ -36,6 +36,24 @@ public final class UiShapes {
         });
     }
 
+    /**
+     * A ring, of the given thickness in pixels, drawn round from the top clockwise for the given
+     * number of 48ths: 48 for the whole ring.
+     */
+    static Shape arc(int size, int thick, int steps) {
+        return make("arc" + size + "t" + thick + "s" + steps, size, size, (x, y, w, h) -> {
+            double cx = w / 2.0, cy = h / 2.0;
+            double dx = x - cx, dy = y - cy;
+            double d = Math.sqrt(dx * dx + dy * dy);
+            double outer = w / 2.0, inner = outer - thick;
+            if (d > outer || d < inner) return false;
+            if (steps >= 48) return true;
+            double angle = Math.atan2(dx, -dy);
+            if (angle < 0) angle += Math.PI * 2;
+            return angle <= Math.PI * 2 * steps / 48.0;
+        });
+    }
+
     /** A thin chevron, pointing down or up, as on a drop-down. */
     static Shape chevron(int w, int h, boolean up) {
         return make("chevron" + w + "x" + h + (up ? "u" : "d"), w, h, (x, y, ww, hh) -> {

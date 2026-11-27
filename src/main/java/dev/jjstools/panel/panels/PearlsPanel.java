@@ -106,15 +106,28 @@ public class PearlsPanel extends Panel {
             else if (ui.hovered(x + 1, cy, w - 8, row)) ui.fill(x + 1, cy, w - 8, row, ui.rowHover());
             int buttons = bw * 2 + gap;
             int bx = x + w - 9 - buttons;
-            ui.onClick(x + 1, cy, bx - x - 2, row, () -> select(it));
+            int ringW = row - 10 + 5;
+            ui.onClick(x + 1, cy, bx - ringW - x - 2, row, () -> select(it));
             int ty = cy + (row - ui.lineH()) / 2 + 1;
-            String label = ui.fit(b.label(), bx - x - 12);
+            String label = ui.fit(b.label(), bx - ringW - x - 12);
             ui.text(label, x + 6, ty, busy ? ui.accent() : ui.fgWell());
             if (!b.bot.isBlank() && !b.base.isBlank()) {
                 int lx = x + 6 + ui.width(label) + 5;
-                ui.small(ui.fitSmall(b.bot, bx - lx - 4), lx, ty + ui.lineH() - ui.smallH(), ui.fgWellDim());
+                ui.small(ui.fitSmall(b.bot, bx - ringW - lx - 4), lx, ty + ui.lineH() - ui.smallH(), ui.fgWellDim());
             }
             boolean ready = connected && !m.running();
+            // 2b2t's message cooldown, left of pull: a blue ring filling round, then green once
+            // a pull message can be sent.
+            int rs = row - 10;
+            int rx = bx - rs - 5, ry = cy + (row - rs) / 2;
+            double wait = m.messageWait();
+            if (wait > 0) {
+                ui.arc(rx, ry, rs, 1.5F, 1, 0x40FFFFFF);
+                ui.arc(rx, ry, rs, 1.5F, m.messageReady(), 0xFF4FA3FF);
+            } else {
+                ui.arc(rx, ry, rs, 1.5F, 1, 0xFF4CD964);
+            }
+            if (ui.hovered(rx, ry, rs, rs)) ui.tooltip(wait > 0 ? "message cooldown: " + (int) Math.ceil(wait) + "s" : "pull message ready");
             ui.button(bx, cy + 2, bw, row - 4, "pull", ready && !b.bot.isBlank() && !b.message.isBlank(), () -> m.run(it, true));
             ui.button(bx + bw + gap, cy + 2, bw, row - 4, "reset", ready, () -> m.run(it, false));
             cy += row;

@@ -770,6 +770,17 @@ public final class Ui {
         });
     }
 
+    /**
+     * A ring with no middle, size units across, drawn from the top clockwise for this fraction
+     * of the way round (1 for the whole ring).
+     */
+    public void arc(int x, int y, int size, float thick, double fraction, int argb) {
+        int steps = (int) Math.round(Math.max(0, Math.min(1, fraction)) * 48);
+        if (steps <= 0) return;
+        int t = Math.max(1, Math.round(thick * pixelsPerUnit()));
+        shape((pw, ph) -> UiShapes.arc(Math.min(pw, ph), t, steps), x, y, size, size, argb);
+    }
+
     /** A thin, smooth chevron, pointing down or up. */
     public void chevron(int x, int y, int w, int h, boolean up, int argb) {
         shape((pw, ph) -> UiShapes.chevron(pw, ph, up), x, y, w, h, argb);

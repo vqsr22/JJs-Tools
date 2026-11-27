@@ -85,6 +85,27 @@ public final class PearlThrower {
     private Saved saved;
     private Bot job;
     private boolean pullQueued;
+
+    /**
+     * 2b2t lets you send a message only once a minute, so a pull message sent within a minute of
+     * the last one never goes. When the last pull message actually left, for the cooldown ring.
+     */
+    public static final long MESSAGE_COOLDOWN_MS = 60_000;
+    private long messageAt;
+    /** Waiting to see the pull message leave; the pull is cancelled if it does not. */
+    private boolean awaitingMessage;
+    private long messageAskedAt;
+
+    /** Seconds until a pull message can be sent again; 0 when it can. */
+    public double messageWait() {
+        if (messageAt == 0) return 0;
+        return Math.max(0, (MESSAGE_COOLDOWN_MS - (System.currentTimeMillis() - messageAt)) / 1000.0);
+    }
+
+    /** How far through the cooldown it is: 0 just sent, 1 ready. */
+    public double messageReady() {
+        return 1 - messageWait() * 1000.0 / MESSAGE_COOLDOWN_MS;
+    }
     private Step step = Step.Idle;
     private long since;
     private int tries;
@@ -289,6 +310,18 @@ public final class PearlThrower {
         step = Step.Idle;
     }
 
+    /** The pull message leaving: the cooldown starts here. */
+    @EventHandler
+    private void onSent(PacketEvent.Sent event) {
+        if (!awaitingMessage) return;
+        if (event.packet instanceof net.minecraft.network.packet.c2s.play.CommandExecutionC2SPacket
+            || event.packet instanceof net.minecraft.network.packet.c2s.play.ChatCommandSignedC2SPacket
+            || event.packet instanceof net.minecraft.network.packet.c2s.play.ChatMessageC2SPacket) {
+            awaitingMessage = false;
+            messageAt = System.currentTimeMillis();
+        }
+    }
+
     @EventHandler
     private void onPacket(PacketEvent.Receive event) {
         if (event.packet instanceof PlayerPositionLookS2CPacket && running()) rubberbandAt = System.currentTimeMillis();
@@ -356,9 +389,19 @@ public final class PearlThrower {
                 stop("give " + job.label() + " a pull message first");
                 return;
             }
+            double wait = messageWait();
+            if (wait > 0) {
+                // It would not be sent, so there is nothing to wait for: no pull.
+                int secs = (int) Math.ceil(wait);
+                ChatUtils.warning("Wait %ds before pulling: 2b2t allows one message a minute.", secs);
+                stop("wait " + secs + "s");
+                return;
+            }
             String msg = template.trim().replace("{bot}", job.bot).replace("{player}", dev.jjstools.compat.Compat.name(mc.player.getGameProfile()));
             // Plain words are whispered to the pearlbot; a command is sent as it is.
             if (!msg.startsWith("/")) msg = "/msg " + job.bot + " " + msg;
+            awaitingMessage = true;
+            messageAskedAt = System.currentTimeMillis();
             ChatUtils.sendPlayerMsg(msg);
             go(Step.Arriving, "pulling at " + job.label());
         } else {
@@ -377,6 +420,7 @@ public final class PearlThrower {
 
     private void stop(String why) {
         status = why;
+        awaitingMessage = false;
         cleanUp();
     }
 
@@ -397,6 +441,12 @@ public final class PearlThrower {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (step == Step.Idle || mc.player == null || mc.world == null || job == null) return;
+        if (awaitingMessage && System.currentTimeMillis() - messageAskedAt > 2000) {
+            // The message never left (blocked or held back), so no pull is coming.
+            awaitingMessage = false;
+            fail("The pull message was not sent, so the pull was cancelled.");
+            return;
+        }
         if (mc.player.isDead() || mc.player.getHealth() <= 0 || mc.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen) {
             // Dying ends the pull: the respawn teleport is not the pearl, and nothing should walk
             // you back to the spot afterwards.
