@@ -33,7 +33,7 @@ public class PearlsPanel extends Panel {
     private boolean expanded;
 
     public PearlsPanel() {
-        super("pearls", "pearls", Items.ENDER_PEARL.getDefaultStack(), 170, 150);
+        super("pearls", "pearls", Items.ENDER_PEARL.getDefaultStack(), 170, 60);
         base.max = 32;
         bot.max = 16;
         base.onChange = () -> edit(b -> b.base = base.text.trim());
