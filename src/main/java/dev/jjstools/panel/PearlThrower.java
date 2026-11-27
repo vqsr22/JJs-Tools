@@ -186,6 +186,8 @@ public final class PearlThrower {
     private BlockPos water;
     private Direction side;
     private double lastPast;
+    /** Times it has gone back to lean out further before a throw. */
+    private int leanTries;
     /** Where you stood as the pearl was thrown, to walk a block back from. */
     private Vec3d thrownFrom = Vec3d.ZERO;
     /**
@@ -439,6 +441,7 @@ public final class PearlThrower {
         if (!pullQueued) startFreeLook();
         tries = 0;
         retries = 0;
+        leanTries = 0;
         chamber = null;
         stand = null;
         lastPos = dev.jjstools.compat.Compat.pos(mc.player);
@@ -758,11 +761,29 @@ public final class PearlThrower {
                     since = System.currentTimeMillis();
                     return;
                 }
-                // A few ticks crouched first, so the server has you crouching before the throw.
+                // A few ticks crouched first, so the server has you crouching before the throw, and
+                // standing still: your own movement is added to the pearl's, and carried it over.
                 if (elapsed() < 250) return;
-                // Through the very middle of the chamber's opening, worked out from how a pearl
-                // actually flies, so it goes in clean and does not clip a wall on the way.
-                float[] aim = aimThrough(opening());
+                Vec3d v = mc.player.getVelocity();
+                if (v.x * v.x + v.z * v.z > 0.003 * 0.003 && elapsed() < 1200) return;
+                // Not out over the opening far enough for the pearl to clear the edge you stand
+                // on: lean out again rather than throw into it.
+                if (past() < 0.14) {
+                    if (++leanTries > 3) {
+                        fail("Could not lean out over the chamber far enough to throw cleanly.");
+                        return;
+                    }
+                    lastPast = past();
+                    stalled = 0;
+                    step = Step.Edging;
+                    since = System.currentTimeMillis();
+                    return;
+                }
+                // Into the very middle of the chamber's water, worked out from how a pearl
+                // actually flies. Aimed at the water rather than the opening, it stays on your side
+                // of the shaft the whole way down and arrives in the middle, never crossing to the
+                // far wall or the open trapdoor against it.
+                float[] aim = aimThrough(waterCentre());
                 mc.player.setYaw(aim[0]);
                 mc.player.setPitch(aim[1]);
                 go(Step.Throwing, null);
@@ -949,11 +970,9 @@ public final class PearlThrower {
         return true;
     }
 
-    /** The middle of the chamber's opening: the centre of its column, at the top of its water (or its trapdoor, if that is higher). */
-    private Vec3d opening() {
-        double topY = water.getY() + 1.0;
-        if (chamber != null && chamber.getX() == water.getX() && chamber.getZ() == water.getZ()) topY = Math.max(topY, chamber.getY() + 1.0);
-        return new Vec3d(water.getX() + 0.5, topY, water.getZ() + 0.5);
+    /** The middle of the chamber's water: the centre of its column, at the water's surface. */
+    private Vec3d waterCentre() {
+        return new Vec3d(water.getX() + 0.5, water.getY() + 0.88, water.getZ() + 0.5);
     }
 
     /**
@@ -970,8 +989,9 @@ public final class PearlThrower {
         float yaw = want < 1e-4 ? mc.player.getYaw() : (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
         float bestPitch = 90;
         double bestErr = Double.MAX_VALUE;
+        // Downward throws only: an upward lob can land in the same place, but by a long way round.
         for (int i = 0; i <= 1800; i++) {
-            float pitch = -90 + i * 0.1F;
+            float pitch = i * 0.05F;
             double rad = Math.toRadians(pitch);
             double vh = 1.5 * Math.cos(rad), vy = -1.5 * Math.sin(rad);
             double h = 0, y = sy;
