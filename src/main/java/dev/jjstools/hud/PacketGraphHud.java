@@ -50,7 +50,7 @@ public class PacketGraphHud extends HudElement {
         .defaultValue(4).range(0, 12).sliderRange(0, 10).build());
 
     private final Setting<Boolean> panel = sgGeneral.add(new BoolSetting.Builder()
-        .name("panel").description("Draw the panel behind it. Off leaves just the graph and its labels.")
+        .name("background").description("Draw the background: the panel and the darker area behind the lines. Off leaves just the lines and their labels.")
         .defaultValue(true).build());
 
     // Lines
@@ -71,6 +71,10 @@ public class PacketGraphHud extends HudElement {
     private final Setting<Integer> fillOpacity = sgLines.add(new IntSetting.Builder()
         .name("fill-opacity").description("How strong the fill under each line is. 0 for none.")
         .defaultValue(55).range(0, 255).sliderRange(0, 160).build());
+
+    private final Setting<Boolean> autoScale = sgLines.add(new BoolSetting.Builder()
+        .name("auto-scale").description("Zoom the graph to the highest line shown, so small counts (a few inventory clicks, or everything with global off) still rise clearly. Off, the top is always the limit.")
+        .defaultValue(true).build());
 
     private final Setting<Boolean> guide = sgLines.add(new BoolSetting.Builder()
         .name("three-quarter-line").description("A faint line at three quarters of the limit.").defaultValue(true).build());
@@ -96,17 +100,25 @@ public class PacketGraphHud extends HudElement {
         .name("follow-jj-theme").description("Take the colours from the theme picked in the Control Panel, and change with it. Off uses the colours below.")
         .defaultValue(true).build());
 
+    private final Setting<Boolean> customBackground = sgColours.add(new BoolSetting.Builder()
+        .name("custom-background-colour").description("Your own background colours below, while the rest follows JJ's theme.")
+        .defaultValue(false).visible(() -> followTheme.get() && panel.get()).build());
+
+    private final Setting<Boolean> customLines = sgColours.add(new BoolSetting.Builder()
+        .name("custom-line-colours").description("Your own colours for the global, inventory and interact lines and their figures, while the rest follows JJ's theme.")
+        .defaultValue(false).visible(followTheme::get).build());
+
     private final Setting<Integer> panelOpacity = sgColours.add(new IntSetting.Builder()
-        .name("panel-opacity").description("How see-through the panel is when following JJ's theme.")
-        .defaultValue(215).range(0, 255).sliderRange(0, 255).visible(followTheme::get).build());
+        .name("panel-opacity").description("How see-through the background is when following JJ's theme.")
+        .defaultValue(215).range(0, 255).sliderRange(0, 255).visible(() -> followTheme.get() && !customBackground.get() && panel.get()).build());
 
     private final Setting<SettingColor> panelColour = sgColours.add(new ColorSetting.Builder()
-        .name("panel-colour").description("Colour of the panel.")
-        .defaultValue(new SettingColor(28, 29, 33, 215)).visible(() -> !followTheme.get()).build());
+        .name("background-colour").description("Colour of the background panel.")
+        .defaultValue(new SettingColor(28, 29, 33, 215)).visible(() -> panel.get() && (!followTheme.get() || customBackground.get())).build());
 
     private final Setting<SettingColor> wellColour = sgColours.add(new ColorSetting.Builder()
-        .name("graph-colour").description("Colour behind the graph.")
-        .defaultValue(new SettingColor(20, 21, 24, 230)).visible(() -> !followTheme.get()).build());
+        .name("graph-colour").description("Colour of the darker area behind the lines.")
+        .defaultValue(new SettingColor(20, 21, 24, 230)).visible(() -> panel.get() && (!followTheme.get() || customBackground.get())).build());
 
     private final Setting<SettingColor> textColour = sgColours.add(new ColorSetting.Builder()
         .name("text-colour").description("Colour of the legend's figures.")
@@ -117,16 +129,16 @@ public class PacketGraphHud extends HudElement {
         .defaultValue(new SettingColor(130, 132, 138)).visible(() -> !followTheme.get()).build());
 
     private final Setting<SettingColor> globalColour = sgColours.add(new ColorSetting.Builder()
-        .name("global-colour").description("Colour of the global line.")
-        .defaultValue(new SettingColor(90, 200, 255)).visible(() -> !followTheme.get()).build());
+        .name("global-colour").description("Colour of the global line and its figure.")
+        .defaultValue(new SettingColor(90, 200, 255)).visible(this::lineColoursShown).build());
 
     private final Setting<SettingColor> inventoryColour = sgColours.add(new ColorSetting.Builder()
-        .name("inventory-colour").description("Colour of the inventory line.")
-        .defaultValue(new SettingColor(255, 170, 60)).visible(() -> !followTheme.get()).build());
+        .name("inventory-colour").description("Colour of the inventory line and its figure.")
+        .defaultValue(new SettingColor(255, 170, 60)).visible(this::lineColoursShown).build());
 
     private final Setting<SettingColor> interactColour = sgColours.add(new ColorSetting.Builder()
-        .name("interact-colour").description("Colour of the interaction line.")
-        .defaultValue(new SettingColor(220, 110, 255)).visible(() -> !followTheme.get()).build());
+        .name("interact-colour").description("Colour of the interaction line and its figure.")
+        .defaultValue(new SettingColor(220, 110, 255)).visible(this::lineColoursShown).build());
 
     private final Setting<SettingColor> warnColour = sgColours.add(new ColorSetting.Builder()
         .name("near-limit-colour").description("Colour a figure turns as it nears its limit.")
@@ -141,6 +153,9 @@ public class PacketGraphHud extends HudElement {
     private int head, count;
     private long lastSample;
     private final double[] eased = new double[3];
+    /** The share of the limit at the top of the graph, eased as the lines rise and fall. */
+    private double scaleTop = 1;
+    private long scaleAt;
 
     private int[] palette;
     private long paletteAt;
@@ -150,6 +165,10 @@ public class PacketGraphHud extends HudElement {
     }
 
     // Colours
+
+    private boolean lineColoursShown() {
+        return !followTheme.get() || customLines.get();
+    }
 
     /** panel, well, accent, text, dim text, and the three line colours. */
     private Color[] colours() {
@@ -170,7 +189,15 @@ public class PacketGraphHud extends HudElement {
         panelC.a = panelOpacity.get();
         Color well = argb(palette[1]);
         well.a = Math.min(255, panelOpacity.get() + 20);
+        if (customBackground.get()) {
+            panelC = panelColour.get();
+            well = wellColour.get();
+        }
         Color accent = argb(palette[3]);
+        if (customLines.get()) {
+            return new Color[] { panelC, well, accent, argb(palette[4]), argb(palette[5]),
+                globalColour.get(), inventoryColour.get(), interactColour.get() };
+        }
         return new Color[] { panelC, well, accent, argb(palette[4]), argb(palette[5]),
             accent, hueShift(accent, 0.33f), hueShift(accent, 0.66f) };
     }
@@ -289,17 +316,20 @@ public class PacketGraphHud extends HudElement {
         if (header > 0) drawHeader(renderer, x + p, y + p, getWidth() - p * 2, c);
 
         double gx = x + p, gy = y + p + header, gw = getWidth() - p * 2, gh = graphHeight.get();
-        SoftShapes.roundRect(gx, gy, gw, gh, Math.max(0, r - (panel.get() ? 1 : 0)), c[1]);
+        if (panel.get()) SoftShapes.roundRect(gx, gy, gw, gh, Math.max(0, r - 1), c[1]);
 
         // Inside the well, kept clear of its rounded corners.
         double inset = Math.max(1, Math.min(r * 0.5, 3));
         double px = gx + inset, py = gy + inset, pw = gw - inset * 2, ph = gh - inset * 2;
-        if (guide.get()) {
-            double gyLine = py + ph * 0.25;
+        int shown = Math.min(count, (int) (history.get() * 1000 / STEP_MS) + 1);
+        boolean[] lines = { showGlobal.get(), showInventory.get(), showInteract.get() };
+        updateScale(shown, lines);
+
+        if (guide.get() && scaleTop >= 0.75) {
+            double gyLine = py + ph - ph * 0.75 / scaleTop;
             renderer.quad(px, gyLine, pw, 1, alpha(c[4], 60));
         }
 
-        int shown = Math.min(count, (int) (history.get() * 1000 / STEP_MS) + 1);
         if (shown >= 3) {
             double perStep = pw / (shown - 2);
             double into = Math.min(1, (System.currentTimeMillis() - lastSample) / (double) STEP_MS);
@@ -309,6 +339,29 @@ public class PacketGraphHud extends HudElement {
                 if (on[s]) drawSeries(renderer, samples[s], shown, perStep, into, px, py, pw, ph, c[5 + s]);
             }
         }
+    }
+
+    /**
+     * With auto-scale, the top of the graph follows the highest line shown over its history,
+     * with some room above, between a tenth of the limit and the limit itself.
+     */
+    private void updateScale(int shown, boolean[] lines) {
+        long now = System.nanoTime();
+        double dt = scaleAt == 0 ? 1 : Math.min(0.1, (now - scaleAt) / 1e9);
+        scaleAt = now;
+        double want = 1;
+        if (autoScale.get()) {
+            double peak = 0;
+            for (int s = 0; s < 3; s++) {
+                if (!lines[s]) continue;
+                for (int k = 0; k < shown; k++) peak = Math.max(peak, samples[s][Math.floorMod(head - k, MAX_SAMPLES)]);
+            }
+            want = Math.max(0.1, Math.min(1, peak * 1.25));
+        }
+        // Rises quickly so a spike is never cut off, settles back slowly.
+        double rate = want > scaleTop ? 14 : 2.5;
+        scaleTop += (want - scaleTop) * (1 - Math.exp(-dt * rate));
+        scaleTop = Math.max(0.1, Math.min(1, scaleTop));
     }
 
     private void drawHeader(HudRenderer renderer, double hx, double hy, double hw, Color[] c) {
@@ -334,7 +387,8 @@ public class PacketGraphHud extends HudElement {
             String count = String.valueOf(now[i]);
             String limit = "/" + limits[i];
             double share = now[i] / (double) limits[i];
-            Color figure = share >= 0.9 ? warnColour.get() : c[3];
+            // The figure in its line's colour, so each reads with its line; red near the limit.
+            Color figure = share >= 0.9 ? warnColour.get() : c[5 + i];
             double wl = renderer.textWidth(limit, sh, scale), wc = renderer.textWidth(count, sh, scale);
             double start = rx - wl - wc - dot - 3;
             if (start < lx) break;
@@ -353,7 +407,7 @@ public class PacketGraphHud extends HudElement {
         for (int k = 0; k < shown; k++) {
             int idx = Math.floorMod(head - (shown - 1 - k), MAX_SAMPLES);
             double sx = px + (k - into) * perStep;
-            double v = Math.max(0, Math.min(1, series[idx]));
+            double v = Math.max(0, Math.min(1, series[idx] / scaleTop));
             double sy = py + ph - v * ph;
             if (k > 0) {
                 // Clipped to the graph's sides: a point where the line crosses each edge.
