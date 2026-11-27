@@ -36,15 +36,15 @@ import java.util.List;
 /**
  * Pulls your pearl from a pearlbot's stasis chamber and puts a new one back in.
  *
- * Pulling whispers the pearlbot, which flips a trapdoor and brings you to the base. Bases
- * usually have many chambers side by side and there is no telling which one is yours, so the
- * chamber is found from where you land: the trapdoor with water at it closest to you the moment
- * you teleport. A couple of seconds later you need a pearl: one you already carry, or one the
+ * Pulling whispers the pearlbot, which flips a trapdoor and brings you to the base. You arrive
+ * where your pearl was, so the chamber is the column straight under the middle of you as you
+ * land: nothing is searched for, so a chamber beside it is never taken for yours. A couple of seconds later you need a pearl: one you already carry, or one the
  * bot handed you. Without one, Baritone walks you to the container you saved for that base and
  * takes a single pearl. Then you walk onto dry ground beside that chamber, across from its
  * trapdoor where there is room, flip the trapdoor back if it has been left the wrong way,
- * crouch-walk to the edge, throw a pearl straight down into the water and step back, ready for
- * next time.
+ * crouch-walk to the edge, throw a pearl through the very middle of the chamber's opening (aimed
+ * from the pearl's real flight, so it never clips a wall) and walk a block back, ready for next
+ * time.
  *
  * Each pearlbot is saved with the name of its base and its pearl container, from the pearls
  * panel, which is what starts it. Its options live in the Control Panel module's Pearls group.
@@ -186,6 +186,8 @@ public final class PearlThrower {
     private BlockPos water;
     private Direction side;
     private double lastPast;
+    /** Where you stood as the pearl was thrown, to walk a block back from. */
+    private Vec3d thrownFrom = Vec3d.ZERO;
     /**
      * Rubber bands: water columns and Grim do not get on, so the server pulling you back is
      * expected rather than a failure. When it last did, and how many times a walk has been
@@ -558,15 +560,11 @@ public final class PearlThrower {
             }
             case Settling -> {
                 if (chamber == null) {
-                    // Found straight away, while you are still standing where you landed.
-                    chamber = findChamber(landing);
-                    if (chamber == null) {
-                        fail("Could not find a stasis chamber where you landed.");
+                    // The column straight under where you landed; nothing searched for.
+                    if (!chamberUnder(landing)) {
+                        fail("No stasis chamber straight under where you landed.");
                         return;
                     }
-                    water = waterOf(chamber);
-                    // Water out of sight under a shut trapdoor: the pearl goes where the trapdoor is.
-                    if (water == null) water = chamber;
                     stand = standSpot(chamber);
                 }
                 // Facing the trapdoor the whole time you wait, so anything dropped to make room
@@ -693,12 +691,14 @@ public final class PearlThrower {
                     return;
                 }
                 BlockState state = mc.world.getBlockState(trapdoor);
-                if (!(state.getBlock() instanceof TrapdoorBlock)) {
+                boolean noTrapdoor = trapdoor.equals(water);
+                if (!noTrapdoor && !(state.getBlock() instanceof TrapdoorBlock)) {
                     fail("The chamber's trapdoor is gone.");
                     return;
                 }
                 boolean want = ControlPanel.pearlTrapdoorOpen();
-                if (state.get(Properties.OPEN) == want) {
+                // No trapdoor in the column: nothing to flip, straight on to the throw.
+                if (noTrapdoor || state.get(Properties.OPEN) == want) {
                     // Crouching keeps you from stepping off the edge into the water.
                     mc.options.sneakKey.setPressed(true);
                     lastPast = past();
@@ -760,15 +760,11 @@ public final class PearlThrower {
                 }
                 // A few ticks crouched first, so the server has you crouching before the throw.
                 if (elapsed() < 250) return;
-                if (past() >= 0.15) {
-                    // Leaning out over the water: straight down.
-                    mc.player.setPitch(90);
-                } else {
-                    // Could not get over the edge: aim into the water instead.
-                    Vec3d centre = Vec3d.ofCenter(water).add(0, 0.3, 0);
-                    mc.player.setYaw((float) Rotations.getYaw(centre));
-                    mc.player.setPitch((float) Rotations.getPitch(centre));
-                }
+                // Through the very middle of the chamber's opening, worked out from how a pearl
+                // actually flies, so it goes in clean and does not clip a wall on the way.
+                float[] aim = aimThrough(opening());
+                mc.player.setYaw(aim[0]);
+                mc.player.setPitch(aim[1]);
                 go(Step.Throwing, null);
             }
             case Throwing -> {
@@ -786,18 +782,22 @@ public final class PearlThrower {
                 mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
                 mc.player.swingHand(Hand.MAIN_HAND);
                 if (ControlPanel.pearlSwapBack()) InvUtils.swapBack();
-                // Straight back off the edge, so you do not touch the pearl as it drops.
+                // Straight back off the edge, standing up, so you do not touch the pearl as it drops.
+                mc.options.sneakKey.setPressed(false);
                 mc.options.backKey.setPressed(true);
+                thrownFrom = dev.jjstools.compat.Compat.pos(mc.player);
                 go(Step.Letting, null);
             }
             case Letting -> {
-                // Back to the middle of the block you threw from, still crouched, facing the water
-                // and looking straight ahead.
-                mc.options.sneakKey.setPressed(true);
+                // A block straight back from where you threw, walking, not crouched, facing the
+                // water and looking straight ahead.
+                mc.options.sneakKey.setPressed(false);
                 if (freeLookMode == null) mc.player.setPitch(0);
                 mc.player.setYaw((float) Rotations.getYaw(Vec3d.ofCenter(water)));
                 mc.options.backKey.setPressed(true);
-                if (past() > -0.45 && elapsed() < 2000) return;
+                Vec3d at = dev.jjstools.compat.Compat.pos(mc.player);
+                double bx = at.x - thrownFrom.x, bz = at.z - thrownFrom.z;
+                if (bx * bx + bz * bz < 1.0 && elapsed() < 2000) return;
                 mc.options.backKey.setPressed(false);
                 mc.options.sneakKey.setPressed(false);
                 if (dropped != null) retrieve("Reset the stasis chamber at " + job.label() + ".", false);
@@ -923,56 +923,80 @@ public final class PearlThrower {
     }
 
     /**
-     * The stasis chamber you were pulled from: of the trapdoors with water at them near where
-     * you landed, the closest. The pearl sat in that water, and you arrive where the pearl was.
+     * The chamber in the column straight under the middle of where you landed: its water, the
+     * top of that water being where a pearl goes in, and its trapdoor in the same column (or,
+     * with none there, the top of the water stands in for it). False if there is no water there.
      */
-    private BlockPos findChamber(BlockPos around) {
-        if (around == null) return null;
-        // Standing on the trapdoor itself (it is shut, so you land on it): that is the chamber,
-        // whether or not its water can be seen from here.
-        for (BlockPos p : new BlockPos[] { around, around.down(), mc.player.getBlockPos(), mc.player.getBlockPos().down() }) {
-            if (mc.world.getBlockState(p).getBlock() instanceof TrapdoorBlock) return p.toImmutable();
-        }
-        BlockPos best = null;
-        double bestDist = Double.MAX_VALUE;
-        for (int dx = -4; dx <= 4; dx++) {
-            for (int dy = -3; dy <= 4; dy++) {
-                for (int dz = -4; dz <= 4; dz++) {
-                    BlockPos p = around.add(dx, dy, dz);
-                    if (!(mc.world.getBlockState(p).getBlock() instanceof TrapdoorBlock)) continue;
-                    BlockPos water = waterOf(p);
-                    if (water == null) continue;
-                    // Chambers sit a block or two apart, so what counts is whose water column
-                    // you are in: across matters far more than up and down.
-                    double dx2 = water.getX() - around.getX(), dz2 = water.getZ() - around.getZ();
-                    double dy2 = water.getY() - around.getY();
-                    double d = (dx2 * dx2 + dz2 * dz2) * 4 + dy2 * dy2;
-                    if (d < bestDist) {
-                        bestDist = d;
-                        best = p.toImmutable();
-                    }
-                }
+    private boolean chamberUnder(BlockPos feet) {
+        if (feet == null) return false;
+        BlockPos top = null;
+        // From a little above your feet down: you may land in the water or on the trapdoor.
+        for (int dy = 1; dy >= -4; dy--) {
+            BlockPos p = feet.up(dy);
+            if (water(p)) {
+                top = p.toImmutable();
+                break;
             }
         }
-        return best;
+        if (top == null) return false;
+        water = top;
+        chamber = null;
+        for (int dy = 2; dy >= -4 && chamber == null; dy--) {
+            BlockPos p = feet.up(dy);
+            if (mc.world.getBlockState(p).getBlock() instanceof TrapdoorBlock) chamber = p.toImmutable();
+        }
+        if (chamber == null) chamber = top;
+        return true;
+    }
+
+    /** The middle of the chamber's opening: the centre of its column, at the top of its water (or its trapdoor, if that is higher). */
+    private Vec3d opening() {
+        double topY = water.getY() + 1.0;
+        if (chamber != null && chamber.getX() == water.getX() && chamber.getZ() == water.getZ()) topY = Math.max(topY, chamber.getY() + 1.0);
+        return new Vec3d(water.getX() + 0.5, topY, water.getZ() + 0.5);
     }
 
     /**
-     * The chamber's water: in the trapdoor's own block, under it (the usual build, a hole of
-     * water in the floor with the trapdoor standing open above it, sometimes a few blocks
-     * down), or beside it. Null if none.
+     * The yaw and pitch that send a pearl through this point. A pearl leaves just under your eyes
+     * at 1.5 blocks a tick, slowing by 1% and falling 0.03 faster every tick, so it bends down;
+     * the pitch is found by flying it, rather than aiming straight at the point, which threw it
+     * short, into the near wall.
      */
-    private BlockPos waterOf(BlockPos trapdoor) {
-        if (water(trapdoor)) return trapdoor;
-        // Under it, up to a few blocks down for a chamber whose water sits lower.
-        for (int down = 1; down <= 3; down++) {
-            if (water(trapdoor.down(down))) return trapdoor.down(down);
+    private float[] aimThrough(Vec3d target) {
+        Vec3d eye = mc.player.getEyePos();
+        double sx = eye.x, sy = eye.y - 0.1, sz = eye.z;
+        double dx = target.x - sx, dz = target.z - sz;
+        double want = Math.sqrt(dx * dx + dz * dz);
+        float yaw = want < 1e-4 ? mc.player.getYaw() : (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+        float bestPitch = 90;
+        double bestErr = Double.MAX_VALUE;
+        for (int i = 0; i <= 1800; i++) {
+            float pitch = -90 + i * 0.1F;
+            double rad = Math.toRadians(pitch);
+            double vh = 1.5 * Math.cos(rad), vy = -1.5 * Math.sin(rad);
+            double h = 0, y = sy;
+            for (int t = 0; t < 60; t++) {
+                double nh = h + vh, ny = y + vy;
+                if (ny <= target.y && vy < 0) {
+                    // Where it crosses the opening's height, between this tick and the last.
+                    double f = (y - target.y) / (y - ny);
+                    double at = h + (nh - h) * f;
+                    double err = Math.abs(at - want);
+                    if (err < bestErr) {
+                        bestErr = err;
+                        bestPitch = pitch;
+                    }
+                    break;
+                }
+                h = nh;
+                y = ny;
+                vh *= 0.99;
+                vy = vy * 0.99 - 0.03;
+            }
         }
-        for (Direction d : Direction.Type.HORIZONTAL) {
-            if (water(trapdoor.offset(d))) return trapdoor.offset(d);
-        }
-        return null;
+        return new float[] { yaw, bestPitch };
     }
+
 
     private boolean water(BlockPos p) {
         return mc.world.getFluidState(p).isIn(net.minecraft.registry.tag.FluidTags.WATER);
