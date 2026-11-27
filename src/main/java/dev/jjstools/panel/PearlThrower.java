@@ -397,6 +397,13 @@ public final class PearlThrower {
     @EventHandler
     private void onTick(TickEvent.Pre event) {
         if (step == Step.Idle || mc.player == null || mc.world == null || job == null) return;
+        if (mc.player.isDead() || mc.player.getHealth() <= 0 || mc.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen) {
+            // Dying ends the pull: the respawn teleport is not the pearl, and nothing should walk
+            // you back to the spot afterwards.
+            StashWalker.stopPath();
+            fail("You died, so the pearl pull was stopped.");
+            return;
+        }
         BlockPos trapdoor = chamber;
 
         // Until the pull teleports you, you move as normal. From then on none of your movement
